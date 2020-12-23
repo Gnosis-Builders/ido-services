@@ -1,0 +1,12 @@
+[workspace]
+members = [
+    "contracts",
+    "model",
+    "orderbook",
+]
+
+default-members = [
+    "contracts",
+    "model",
+    "orderbook",
+]
