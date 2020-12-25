@@ -7,3 +7,7 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+model = { path = "../model" }
+collection = "0.1.1"
+primitive-types = { version = "0.7" }
+
