@@ -112,4 +112,21 @@ mod tests {
         let deserialized: Order = Order::from_str(expected.clone()).unwrap();
         assert_eq!(deserialized, order);
     }
+
+    #[test]
+    fn ordering_of_orders() {
+        let normal_order = Order {
+            sell_amount: U256::from_dec_str("1230").unwrap(),
+            buy_amount: U256::from_dec_str("123").unwrap(),
+            user_id: 10 as u64,
+        };
+        let higher_priced_order = Order {
+            sell_amount: U256::from_dec_str("1230").unwrap(),
+            buy_amount: U256::from_dec_str("1000").unwrap(),
+            user_id: 10 as u64,
+        };
+        assert_eq!(normal_order.cmp(&higher_priced_order), Ordering::Less);
+        assert_eq!(normal_order.cmp(&normal_order), Ordering::Equal);
+        assert_eq!(higher_priced_order.cmp(&normal_order), Ordering::Greater);
+    }
 }
