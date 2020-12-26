@@ -1,20 +1,23 @@
+use contracts::EasyAuction;
 use model::order::Order;
 use std::collections::{hash_map::Entry, HashMap};
 
 #[derive(Eq, PartialEq, Clone, Debug)]
-struct Orderbook {
+pub struct Orderbook {
     orders: HashMap<u64, Vec<Order>>,
+    last_block_considered: u64,
 }
 
 impl Orderbook {
     #[allow(dead_code)]
-    fn new() -> Self {
+    pub fn new() -> Self {
         Orderbook {
             orders: HashMap::new(),
+            last_block_considered: 0,
         }
     }
     #[allow(dead_code)]
-    fn insert_order(&mut self, auction_id: u64, order: Order) {
+    pub fn insert_order(&mut self, auction_id: u64, order: Order) {
         match self.orders.entry(auction_id) {
             Entry::Occupied(mut order_vec) => {
                 order_vec.get_mut().push(order);
@@ -25,7 +28,7 @@ impl Orderbook {
         }
     }
     #[allow(dead_code)]
-    fn sort_orders(&mut self, auction_id: u64) {
+    pub fn sort_orders(&mut self, auction_id: u64) {
         match self.orders.entry(auction_id) {
             Entry::Occupied(mut order_vec) => {
                 order_vec.get_mut().sort();
@@ -42,6 +45,12 @@ impl Orderbook {
             }
             Entry::Vacant(_) => false,
         }
+    }
+    pub async fn run_maintenance_with_reorg_protection(&self, _contract: &EasyAuction) {
+        unimplemented!()
+    }
+    pub async fn run_maintenance(&self, _contract: &EasyAuction) {
+        unimplemented!()
     }
 }
 

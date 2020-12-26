@@ -78,14 +78,6 @@ impl Ord for Order {
     }
 }
 
-// impl PartialEq for Order {
-//     fn eq(&self, other: &Self) -> bool {
-//         self.sell_amount == other.sell_amount
-//             && self.buy_amount == other.buy_amount
-//             && self.user_id == other.user_id
-//     }
-// }
-
 impl Serialize for Order {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where

@@ -3,10 +3,12 @@ members = [
     "contracts",
     "model",
     "orderbook",
+    "tracing-setup",
 ]
 
 default-members = [
     "contracts",
     "model",
     "orderbook",
+    "tracing-setup",
 ]
