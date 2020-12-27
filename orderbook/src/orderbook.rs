@@ -4,11 +4,13 @@ use lazy_static::lazy_static;
 use model::order::Order;
 use primitive_types::U256;
 use std::collections::{hash_map::Entry, HashMap};
+use std::str::FromStr;
 use tokio::sync::RwLock;
 
 #[derive(Default, Debug)]
 pub struct Orderbook {
     pub orders: RwLock<HashMap<u64, Vec<Order>>>,
+    pub initial_order: RwLock<HashMap<u64, Order>>,
 }
 lazy_static! {
     pub static ref QUEUE_START: Order = Order {
@@ -22,6 +24,7 @@ impl Orderbook {
     pub fn new() -> Self {
         Orderbook {
             orders: RwLock::new(HashMap::new()),
+            initial_order: RwLock::new(HashMap::new()),
         }
     }
     #[allow(dead_code)]
@@ -35,6 +38,14 @@ impl Orderbook {
                 hashmap.insert(auction_id, vec![order]);
             }
         }
+    }
+    pub async fn update_initial_order(&mut self, auction_id: u64, order: Order) {
+        let mut order_hashmap = self.initial_order.write().await;
+        order_hashmap.insert(auction_id, order);
+    }
+    pub async fn is_initial_order_set(&self, auction_id: u64) -> bool {
+        let order_hashmap = self.initial_order.read().await;
+        order_hashmap.contains_key(&auction_id)
     }
     #[allow(dead_code)]
     pub async fn sort_orders(&mut self, auction_id: u64) {
@@ -80,6 +91,23 @@ impl Orderbook {
             Entry::Vacant(_) => *QUEUE_START,
         }
     }
+    pub async fn update_initial_order_if_not_set(
+        &self,
+        auction_id: u64,
+        event_reader: &EventReader,
+    ) -> Result<()> {
+        if !self.is_initial_order_set(auction_id).await {
+            let auction_data = event_reader
+                .contract
+                .auction_data(U256::from(auction_id))
+                .call()
+                .await?;
+            let initial_order: Order = FromStr::from_str(&std::str::from_utf8(&auction_data.3)?)?;
+            let mut order_hashmap = self.initial_order.write().await;
+            order_hashmap.insert(auction_id, initial_order);
+        }
+        Ok(())
+    }
     pub async fn run_maintenance(
         &self,
         event_reader: &EventReader,
@@ -89,6 +117,8 @@ impl Orderbook {
         let max_auction_id = event_reader.contract.auction_counter().call().await?;
         let mut last_considered_block = 0;
         for auction_id in 1..(max_auction_id.low_u64() + 1) {
+            self.update_initial_order_if_not_set(auction_id, event_reader)
+                .await?;
             let (new_orders, last_considered_block_from_events) = event_reader
                 .get_newly_placed_orders(last_block_considered, auction_id, reorg_protection)
                 .await

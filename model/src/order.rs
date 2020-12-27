@@ -7,7 +7,7 @@ use std::convert::TryInto;
 use std::fmt::{self, Display};
 use std::str::FromStr;
 
-#[derive(Eq, PartialEq, Clone, Debug, Copy)]
+#[derive(Eq, PartialEq, Clone, Debug, Copy, Default)]
 pub struct Order {
     pub sell_amount: U256,
     pub buy_amount: U256,
