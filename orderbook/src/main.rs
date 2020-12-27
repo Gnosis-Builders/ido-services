@@ -1,6 +1,7 @@
 use contracts::EasyAuction;
 use orderbook::event_reader::EventReader;
 use orderbook::orderbook::Orderbook;
+use orderbook::serve_task;
 use std::num::ParseFloatError;
 use std::sync::Arc;
 use std::{net::SocketAddr, time::Duration};
@@ -94,12 +95,14 @@ async fn main() {
     let event_reader = EventReader::new(easy_auction_contract, web3);
     let orderbook_latest = Arc::new(Orderbook::new());
     let orderbook_reorg_save = Arc::new(Orderbook::new());
+    let serve_task = serve_task(orderbook_latest.clone(), args.bind_address);
     let maintenance_task = task::spawn(orderbook_maintenance(
         orderbook_latest,
         orderbook_reorg_save,
         event_reader,
     ));
     tokio::select! {
+        result = serve_task => tracing::error!(?result, "serve task exited"),
         result = maintenance_task => tracing::error!(?result, "maintenance task exited"),
     };
 }

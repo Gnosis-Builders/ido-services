@@ -13,7 +13,7 @@ pub struct Orderbook {
 lazy_static! {
     pub static ref QUEUE_START: Order = Order {
         buy_amount: U256::from("0"),
-        sell_amount: U256::from("0"),
+        sell_amount: U256::from("1"),
         user_id: 0 as u64,
     };
 }
