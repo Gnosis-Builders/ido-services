@@ -1,12 +1,13 @@
 use primitive_types::U256;
 use serde::Serialize;
 use serde::Serializer;
+use serde::{de, Deserialize, Deserializer};
 use std::cmp::Ordering;
 use std::convert::TryInto;
 use std::fmt::{self, Display};
 use std::str::FromStr;
 
-#[derive(Eq, PartialEq, Clone, Debug)]
+#[derive(Eq, PartialEq, Clone, Debug, Copy)]
 pub struct Order {
     pub sell_amount: U256,
     pub buy_amount: U256,
@@ -84,6 +85,16 @@ impl Serialize for Order {
         S: Serializer,
     {
         serializer.serialize_str(self.to_string().as_str())
+    }
+}
+
+impl<'de> Deserialize<'de> for Order {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        FromStr::from_str(&s).map_err(de::Error::custom)
     }
 }
 
