@@ -39,7 +39,7 @@ struct Arguments {
     pub node_timeout: Duration,
 }
 
-const MAINTENANCE_INTERVAL: Duration = Duration::from_secs(1);
+const MAINTENANCE_INTERVAL: Duration = Duration::from_secs(3);
 
 pub async fn orderbook_maintenance(
     orderbook_latest: Arc<Orderbook>,

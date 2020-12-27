@@ -1,7 +1,8 @@
 use crate::event_reader::EventReader;
 use anyhow::Result;
+use hex::encode;
 use lazy_static::lazy_static;
-use model::order::Order;
+use model::order::{Order, OrderbookDisplay, PricePoint};
 use primitive_types::U256;
 use std::collections::{hash_map::Entry, HashMap};
 use std::str::FromStr;
@@ -14,10 +15,11 @@ pub struct Orderbook {
 }
 lazy_static! {
     pub static ref QUEUE_START: Order = Order {
-        buy_amount: U256::from("0"),
-        sell_amount: U256::from("1"),
+        buy_amount: U256::from_dec_str("0").unwrap(),
+        sell_amount: U256::from_dec_str("1").unwrap(),
         user_id: 0 as u64,
     };
+    pub static ref EIGHTEEN: U256 = U256::from_dec_str("18").unwrap();
 }
 impl Orderbook {
     #[allow(dead_code)]
@@ -37,6 +39,14 @@ impl Orderbook {
             Entry::Vacant(_) => {
                 hashmap.insert(auction_id, vec![order]);
             }
+        }
+    }
+    pub async fn get_initial_order(&self, auction_id: u64) -> Order {
+        let order_hashmap = self.initial_order.read().await;
+        if let Some(order) = order_hashmap.get(&auction_id) {
+            *order
+        } else {
+            *QUEUE_START
         }
     }
     pub async fn update_initial_order(&mut self, auction_id: u64, order: Order) {
@@ -67,6 +77,31 @@ impl Orderbook {
             }
             Entry::Vacant(_) => false,
         }
+    }
+    #[allow(dead_code)]
+    pub async fn get_order_book_display(&self, auction_id: u64) -> OrderbookDisplay {
+        let orders_hashmap = self.orders.write().await;
+        let asks: Vec<PricePoint>;
+        if let Some(orders) = orders_hashmap.get(&auction_id) {
+            asks = orders
+                .iter()
+                .map(|order| order.to_price_point(*EIGHTEEN, *EIGHTEEN))
+                .collect();
+        } else {
+            asks = Vec::new();
+        }
+        let initial_order = vec![self.get_initial_order(auction_id).await];
+        let bids: Vec<PricePoint> = initial_order
+            .iter()
+            .map(|order| Order {
+                // << invert price for unified representation of different orders.
+                sell_amount: order.buy_amount,
+                buy_amount: order.sell_amount,
+                user_id: order.user_id,
+            })
+            .map(|order| order.to_price_point(*EIGHTEEN, *EIGHTEEN))
+            .collect();
+        OrderbookDisplay { asks, bids }
     }
     #[allow(dead_code)]
     pub async fn get_orders(&mut self, auction_id: u64) -> Vec<Order> {
@@ -102,7 +137,7 @@ impl Orderbook {
                 .auction_data(U256::from(auction_id))
                 .call()
                 .await?;
-            let initial_order: Order = FromStr::from_str(&std::str::from_utf8(&auction_data.3)?)?;
+            let initial_order: Order = FromStr::from_str(&encode(&auction_data.3))?;
             let mut order_hashmap = self.initial_order.write().await;
             order_hashmap.insert(auction_id, initial_order);
         }
@@ -116,9 +151,10 @@ impl Orderbook {
     ) -> Result<u64> {
         let max_auction_id = event_reader.contract.auction_counter().call().await?;
         let mut last_considered_block = 0;
-        for auction_id in 1..(max_auction_id.low_u64() + 1) {
+        for auction_id in 1..=(max_auction_id.low_u64()) {
             self.update_initial_order_if_not_set(auction_id, event_reader)
-                .await?;
+                .await
+                .expect("update_initial_order_if_not_set was not successful");
             let (new_orders, last_considered_block_from_events) = event_reader
                 .get_newly_placed_orders(last_block_considered, auction_id, reorg_protection)
                 .await

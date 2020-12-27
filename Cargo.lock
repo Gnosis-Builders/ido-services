@@ -1303,6 +1303,7 @@ version = "0.1.0"
 dependencies = [
  "hex",
  "hex-literal",
+ "lazy_static",
  "primitive-types",
  "serde",
 ]
@@ -1453,9 +1454,11 @@ dependencies = [
  "contracts",
  "ethcontract",
  "futures 0.3.8",
+ "hex",
  "lazy_static",
  "model",
  "primitive-types",
+ "serde",
  "serde_json",
  "structopt",
  "tokio",

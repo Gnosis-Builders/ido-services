@@ -19,6 +19,15 @@ pub fn get_previous_order(
         .and_then(handler::get_previous_order)
 }
 
+pub fn get_order_book_display_data(
+    orderbook: Arc<Orderbook>,
+) -> impl Filter<Extract = (impl warp::Reply,), Error = warp::Rejection> + Clone {
+    warp::path!("get_order_book_display_data" / u64)
+        .and(warp::get())
+        .and(with_orderbook(orderbook))
+        .and_then(handler::get_order_book_display_data)
+}
+
 #[cfg(test)]
 pub mod test_util {
     use super::*;

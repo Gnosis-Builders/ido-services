@@ -1,3 +1,4 @@
+use lazy_static::lazy_static;
 use primitive_types::U256;
 use serde::Serialize;
 use serde::Serializer;
@@ -12,6 +13,45 @@ pub struct Order {
     pub sell_amount: U256,
     pub buy_amount: U256,
     pub user_id: u64,
+}
+
+#[derive(Default, Debug, Serialize)]
+pub struct OrderbookDisplay {
+    pub asks: Vec<PricePoint>,
+    pub bids: Vec<PricePoint>,
+}
+#[derive(Default, Debug, Clone, Copy, Serialize)]
+pub struct PricePoint {
+    price: f64,
+    volume: f64,
+}
+lazy_static! {
+    pub static ref TEN: U256 = U256::from_dec_str("10").unwrap();
+    pub static ref EIGHTEEN: U256 = U256::from_dec_str("18").unwrap();
+}
+impl Order {
+    pub fn to_price_point(
+        &self,
+        decimals_buy_token: U256,
+        decimals_sell_token: U256,
+    ) -> PricePoint {
+        let price_numerator = self
+            .buy_amount
+            .checked_mul(TEN.pow(decimals_sell_token))
+            .expect("buy_amount should not overflow")
+            .to_f64_lossy();
+        let price_denominator = self
+            .sell_amount
+            .checked_mul(TEN.pow(decimals_buy_token))
+            .expect("sell_amount should not overflow")
+            .to_f64_lossy();
+        let volume_numerator = self.sell_amount.to_f64_lossy();
+        let volume_denominator = (TEN.pow(decimals_sell_token)).to_f64_lossy();
+        PricePoint {
+            price: price_numerator / price_denominator,
+            volume: volume_numerator / volume_denominator,
+        }
+    }
 }
 
 impl FromStr for Order {
@@ -131,5 +171,50 @@ mod tests {
         assert_eq!(normal_order.cmp(&higher_priced_order), Ordering::Less);
         assert_eq!(normal_order.cmp(&normal_order), Ordering::Equal);
         assert_eq!(higher_priced_order.cmp(&normal_order), Ordering::Greater);
+    }
+
+    #[test]
+    fn to_price_point_with_18_digits() {
+        let normal_order = Order {
+            sell_amount: U256::from_dec_str("100000000000000000000").unwrap(),
+            buy_amount: U256::from_dec_str("110000000000000000000").unwrap(),
+            user_id: 10 as u64,
+        };
+        let expected_price_point = PricePoint {
+            price: 11_f64 / 10_f64,
+            volume: 100.0_f64,
+        };
+        assert_eq!(
+            normal_order.to_price_point(*EIGHTEEN, *EIGHTEEN).price,
+            expected_price_point.price
+        );
+        assert_eq!(
+            normal_order.to_price_point(*EIGHTEEN, *EIGHTEEN).volume,
+            expected_price_point.volume
+        );
+    }
+    #[test]
+    fn to_price_point_without_18_digits() {
+        let normal_order = Order {
+            sell_amount: U256::from_dec_str("100000000000000000000").unwrap(),
+            buy_amount: U256::from_dec_str("110000000000000000000").unwrap(),
+            user_id: 10 as u64,
+        };
+        let expected_price_point = PricePoint {
+            price: 11_f64 / 10_f64 * 10_f64.powi(12),
+            volume: 100.0_f64 * 10_f64.powi(12),
+        };
+        assert_eq!(
+            normal_order
+                .to_price_point(U256::from("6"), *EIGHTEEN)
+                .price,
+            expected_price_point.price
+        );
+        assert_eq!(
+            normal_order
+                .to_price_point(*EIGHTEEN, U256::from("6"))
+                .volume,
+            expected_price_point.volume
+        );
     }
 }
