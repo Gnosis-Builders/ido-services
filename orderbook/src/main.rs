@@ -1,4 +1,5 @@
 use contracts::EasyAuction;
+use orderbook::event_reader::EventReader;
 use orderbook::orderbook::Orderbook;
 use std::num::ParseFloatError;
 use std::sync::Arc;
@@ -23,7 +24,7 @@ struct Arguments {
     #[structopt(
         long,
         env = "NODE_URL",
-        default_value = "https://dev-openethereum.rinkeby.gnosisdev.com:8545"
+        default_value = "https://dev-openethereum.rinkeby.gnosisdev.com"
     )]
     pub node_url: Url,
 
@@ -31,25 +32,50 @@ struct Arguments {
     #[structopt(
                 long,
                 env = "NODE_TIMEOUT",
-                default_value = "10",
+                default_value = "5",
                 parse(try_from_str = duration_from_seconds),
             )]
     pub node_timeout: Duration,
 }
 
-const MAINTENANCE_INTERVAL: Duration = Duration::from_secs(10);
+const MAINTENANCE_INTERVAL: Duration = Duration::from_secs(1);
 
 pub async fn orderbook_maintenance(
-    orderbook: Arc<Orderbook>,
+    orderbook_latest: Arc<Orderbook>,
     orderbook_reorg_protected: Arc<Orderbook>,
-    contract: EasyAuction,
+    event_reader: EventReader,
 ) -> ! {
+    let mut last_block_considered_for_reorg_protected_orderbook = 7789300;
     loop {
-        tracing::debug!("running order book maintenance");
-        orderbook_reorg_protected
-            .run_maintenance_with_reorg_protection(&contract)
-            .await;
-        orderbook.run_maintenance(&contract).await;
+        tracing::debug!("running order book maintenance with reorg protection");
+        last_block_considered_for_reorg_protected_orderbook = orderbook_reorg_protected
+            .run_maintenance(
+                &event_reader,
+                last_block_considered_for_reorg_protected_orderbook,
+                true,
+            )
+            .await
+            .expect("maintenance function not successful");
+        // most ridiculous swap: Resetting the orderbook_latest to orderbook_protected
+        {
+            let mut orderbook = orderbook_latest.orders.write().await;
+            let orderbook_reorg_save = orderbook_reorg_protected.orders.read().await;
+            for auction_id in orderbook_reorg_save.keys() {
+                orderbook.insert(
+                    *auction_id,
+                    orderbook_reorg_save.get(auction_id).unwrap().clone(),
+                );
+            }
+        }
+        orderbook_latest
+            .run_maintenance(
+                &event_reader,
+                last_block_considered_for_reorg_protected_orderbook,
+                false,
+            )
+            .await
+            .expect("maintenance function not successful");
+
         tokio::time::delay_for(MAINTENANCE_INTERVAL).await;
     }
 }
@@ -59,19 +85,19 @@ async fn main() {
     let args = Arguments::from_args();
     tracing_setup::initialize(args.log_filter.as_str());
     tracing::info!("running order book with {:#?}", args);
-
     let transport =
         web3::transports::Http::new(args.node_url.as_str()).expect("transport creation failed");
     let web3 = web3::Web3::new(transport);
     let easy_auction_contract = EasyAuction::deployed(&web3)
         .await
         .expect("Couldn't load deployed easyAuction");
+    let event_reader = EventReader::new(easy_auction_contract, web3);
     let orderbook_latest = Arc::new(Orderbook::new());
     let orderbook_reorg_save = Arc::new(Orderbook::new());
     let maintenance_task = task::spawn(orderbook_maintenance(
         orderbook_latest,
         orderbook_reorg_save,
-        easy_auction_contract,
+        event_reader,
     ));
     tokio::select! {
         result = maintenance_task => tracing::error!(?result, "maintenance task exited"),
