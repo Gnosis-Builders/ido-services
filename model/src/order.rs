@@ -35,12 +35,12 @@ impl Order {
         decimals_buy_token: U256,
         decimals_sell_token: U256,
     ) -> PricePoint {
-        let price_numerator = self
+        let price_denominator = self
             .buy_amount
             .checked_mul(TEN.pow(decimals_sell_token))
             .expect("buy_amount should not overflow")
             .to_f64_lossy();
-        let price_denominator = self
+        let price_numerator = self
             .sell_amount
             .checked_mul(TEN.pow(decimals_buy_token))
             .expect("sell_amount should not overflow")
@@ -181,7 +181,7 @@ mod tests {
             user_id: 10 as u64,
         };
         let expected_price_point = PricePoint {
-            price: 11_f64 / 10_f64,
+            price: 10_f64 / 11_f64,
             volume: 100.0_f64,
         };
         assert_eq!(
@@ -201,7 +201,7 @@ mod tests {
             user_id: 10 as u64,
         };
         let expected_price_point = PricePoint {
-            price: 11_f64 / 10_f64 * 10_f64.powi(12),
+            price: 10_f64 / (11_f64 * 10_f64.powi(12)),
             volume: 100.0_f64 * 10_f64.powi(12),
         };
         assert_eq!(

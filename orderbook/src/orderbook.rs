@@ -78,7 +78,6 @@ impl Orderbook {
             Entry::Vacant(_) => false,
         }
     }
-    #[allow(dead_code)]
     pub async fn get_order_book_display(&self, auction_id: u64) -> OrderbookDisplay {
         let orders_hashmap = self.orders.write().await;
         let asks: Vec<PricePoint>;
@@ -149,7 +148,12 @@ impl Orderbook {
         last_block_considered: u64,
         reorg_protection: bool,
     ) -> Result<u64> {
-        let max_auction_id = event_reader.contract.auction_counter().call().await?;
+        let max_auction_id = event_reader
+            .contract
+            .auction_counter()
+            .call()
+            .await
+            .expect("could not get auctions_counter");
         let mut last_considered_block = 0;
         for auction_id in 1..=(max_auction_id.low_u64()) {
             self.update_initial_order_if_not_set(auction_id, event_reader)
