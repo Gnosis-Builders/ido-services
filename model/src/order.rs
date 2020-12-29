@@ -152,7 +152,7 @@ mod tests {
         let expected = "0x000000000000000a00000000000000000000007b0000000000000000000004ce";
         assert_eq!(order.to_string(), expected);
         assert_eq!(format!("{}", order), expected);
-        let deserialized: Order = Order::from_str(expected.clone()).unwrap();
+        let deserialized: Order = Order::from_str(expected).unwrap();
         assert_eq!(deserialized, order);
     }
 
@@ -184,14 +184,18 @@ mod tests {
             price: 10_f64 / 11_f64,
             volume: 100.0_f64,
         };
-        assert_eq!(
+        assert!(float_cmp::approx_eq!(
+            f64,
             normal_order.to_price_point(*EIGHTEEN, *EIGHTEEN).price,
-            expected_price_point.price
-        );
-        assert_eq!(
+            expected_price_point.price,
+            ulps = 2
+        ));
+        assert!(float_cmp::approx_eq!(
+            f64,
             normal_order.to_price_point(*EIGHTEEN, *EIGHTEEN).volume,
-            expected_price_point.volume
-        );
+            expected_price_point.volume,
+            ulps = 2
+        ));
     }
     #[test]
     fn to_price_point_without_18_digits() {
@@ -204,17 +208,21 @@ mod tests {
             price: 10_f64 / (11_f64 * 10_f64.powi(12)),
             volume: 100.0_f64 * 10_f64.powi(12),
         };
-        assert_eq!(
+        assert!(float_cmp::approx_eq!(
+            f64,
             normal_order
                 .to_price_point(U256::from("6"), *EIGHTEEN)
                 .price,
-            expected_price_point.price
-        );
-        assert_eq!(
+            expected_price_point.price,
+            ulps = 2
+        ));
+        assert!(float_cmp::approx_eq!(
+            f64,
             normal_order
                 .to_price_point(*EIGHTEEN, U256::from("6"))
                 .volume,
-            expected_price_point.volume
-        );
+            expected_price_point.volume,
+            ulps = 2
+        ));
     }
 }

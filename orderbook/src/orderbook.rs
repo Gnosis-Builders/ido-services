@@ -117,7 +117,7 @@ impl Orderbook {
                 let mut smaller_order: Order = *QUEUE_START;
                 for order_from_vec in order_vec.get() {
                     if order_from_vec < &order {
-                        smaller_order = order_from_vec.clone();
+                        smaller_order = *order_from_vec;
                     }
                 }
                 smaller_order
@@ -196,7 +196,7 @@ mod tests {
         };
         let auction_id = 1;
         let mut orderbook = Orderbook::new();
-        orderbook.insert_order(auction_id, order.clone()).await;
+        orderbook.insert_order(auction_id, order).await;
         assert_eq!(orderbook.get_orders(auction_id).await, vec![order]);
     }
 
@@ -209,13 +209,13 @@ mod tests {
         };
         let auction_id = 1;
         let mut orderbook = Orderbook::new();
-        orderbook.insert_order(auction_id, order_1.clone()).await;
+        orderbook.insert_order(auction_id, order_1).await;
         let order_2 = Order {
             sell_amount: U256::from_dec_str("1230").unwrap(),
             buy_amount: U256::from_dec_str("12").unwrap(),
             user_id: 10 as u64,
         };
-        orderbook.insert_order(auction_id, order_2.clone()).await;
+        orderbook.insert_order(auction_id, order_2).await;
         orderbook.sort_orders(auction_id).await;
         assert_eq!(
             orderbook.get_orders(auction_id).await,
@@ -236,7 +236,7 @@ mod tests {
             orderbook.get_previous_order(auction_id, order_1).await,
             *QUEUE_START
         );
-        orderbook.insert_order(auction_id, order_1.clone()).await;
+        orderbook.insert_order(auction_id, order_1).await;
         let order_2 = Order {
             sell_amount: U256::from_dec_str("2").unwrap(),
             buy_amount: U256::from_dec_str("3").unwrap(),

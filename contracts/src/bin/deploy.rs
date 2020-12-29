@@ -33,8 +33,6 @@ async fn run() -> Result<()> {
     log::info!("checking connection to local test node {}", NODE_URL);
     wait_for_node(&web3).await?;
 
-    let accounts: Vec<Address> = web3.eth().accounts().await.expect("get accounts failed");
-
     macro_rules! deploy {
             ($contract:ident) => { deploy!($contract ()) };
             ($contract:ident ( $($param:expr),* $(,)? )) => {{

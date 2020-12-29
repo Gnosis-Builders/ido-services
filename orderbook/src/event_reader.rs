@@ -29,7 +29,7 @@ impl EventReader {
         if reorg_protection {
             to_block -= BLOCK_CONFIRMATION_COUNT;
         }
-        let from_block = last_handled_block.clone();
+        let from_block = last_handled_block;
         if from_block > to_block {
             return Ok((Vec::new(), to_block));
         }
