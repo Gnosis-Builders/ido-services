@@ -1,4 +1,4 @@
-use anyhow::{ensure, Result};
+use anyhow::Result;
 use contracts::EasyAuction;
 use ethcontract::BlockNumber;
 use model::order::Order;
@@ -30,14 +30,9 @@ impl EventReader {
             to_block -= BLOCK_CONFIRMATION_COUNT;
         }
         let from_block = last_handled_block.clone();
-        ensure!(
-            from_block <= to_block,
-            format!(
-                "current block number according to node is {} which is more than {} blocks in the \
-             past compared to previous current block {}",
-                to_block, BLOCK_CONFIRMATION_COUNT, from_block
-            )
-        );
+        if from_block > to_block {
+            return Ok((Vec::new(), to_block));
+        }
         info!(
             "Updating event based orderbook from block {} to block {} for auctionId {}.",
             from_block, to_block, auction_id,

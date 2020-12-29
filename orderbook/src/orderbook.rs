@@ -80,17 +80,17 @@ impl Orderbook {
     }
     pub async fn get_order_book_display(&self, auction_id: u64) -> OrderbookDisplay {
         let orders_hashmap = self.orders.write().await;
-        let asks: Vec<PricePoint>;
+        let bids: Vec<PricePoint>;
         if let Some(orders) = orders_hashmap.get(&auction_id) {
-            asks = orders
+            bids = orders
                 .iter()
                 .map(|order| order.to_price_point(*EIGHTEEN, *EIGHTEEN))
                 .collect();
         } else {
-            asks = Vec::new();
+            bids = Vec::new();
         }
         let initial_order = vec![self.get_initial_order(auction_id).await];
-        let bids: Vec<PricePoint> = initial_order
+        let asks: Vec<PricePoint> = initial_order
             .iter()
             .map(|order| Order {
                 // << invert price for unified representation of different orders.
@@ -153,7 +153,7 @@ impl Orderbook {
             .auction_counter()
             .call()
             .await
-            .expect("could not get auctions_counter");
+            .unwrap_or(U256::zero());
         let mut last_considered_block = 0;
         for auction_id in 1..=(max_auction_id.low_u64()) {
             self.update_initial_order_if_not_set(auction_id, event_reader)
@@ -177,7 +177,7 @@ impl Orderbook {
                 }
             }
         }
-        Ok(last_considered_block)
+        Ok(last_considered_block + 1)
     }
 }
 
