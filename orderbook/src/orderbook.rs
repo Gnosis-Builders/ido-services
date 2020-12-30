@@ -1,5 +1,6 @@
 use crate::event_reader::EventReader;
 use anyhow::Result;
+use ethcontract::Address;
 use hex::encode;
 use lazy_static::lazy_static;
 use model::order::{Order, OrderbookDisplay, PricePoint};
@@ -12,6 +13,8 @@ use tokio::sync::RwLock;
 pub struct Orderbook {
     pub orders: RwLock<HashMap<u64, Vec<Order>>>,
     pub initial_order: RwLock<HashMap<u64, Order>>,
+    pub decimals_auctioning_token: RwLock<Option<U256>>,
+    pub decimals_bidding_token: RwLock<Option<U256>>,
 }
 lazy_static! {
     pub static ref QUEUE_START: Order = Order {
@@ -27,6 +30,8 @@ impl Orderbook {
         Orderbook {
             orders: RwLock::new(HashMap::new()),
             initial_order: RwLock::new(HashMap::new()),
+            decimals_auctioning_token: RwLock::new(None),
+            decimals_bidding_token: RwLock::new(None),
         }
     }
     #[allow(dead_code)]
@@ -78,13 +83,25 @@ impl Orderbook {
             Entry::Vacant(_) => false,
         }
     }
-    pub async fn get_order_book_display(&self, auction_id: u64) -> OrderbookDisplay {
+    pub async fn get_order_book_display(&self, auction_id: u64) -> Result<OrderbookDisplay> {
         let orders_hashmap = self.orders.write().await;
+        let decimals_auctioning_token = self
+            .decimals_auctioning_token
+            .read()
+            .await
+            .expect("auction not yet initialized in backend");
+        let decimals_bidding_token = self
+            .decimals_bidding_token
+            .read()
+            .await
+            .expect("auction not yet initialized in backend");
         let bids: Vec<PricePoint>;
         if let Some(orders) = orders_hashmap.get(&auction_id) {
             bids = orders
                 .iter()
-                .map(|order| order.to_price_point(*EIGHTEEN, *EIGHTEEN))
+                .map(|order| {
+                    order.to_price_point(decimals_auctioning_token, decimals_bidding_token)
+                })
                 .collect();
         } else {
             bids = Vec::new();
@@ -98,9 +115,9 @@ impl Orderbook {
                 buy_amount: order.sell_amount,
                 user_id: order.user_id,
             })
-            .map(|order| order.to_price_point(*EIGHTEEN, *EIGHTEEN))
+            .map(|order| order.to_price_point(decimals_auctioning_token, decimals_bidding_token))
             .collect();
-        OrderbookDisplay { asks, bids }
+        Ok(OrderbookDisplay { asks, bids })
     }
     #[allow(dead_code)]
     pub async fn get_orders(&mut self, auction_id: u64) -> Vec<Order> {
@@ -125,7 +142,7 @@ impl Orderbook {
             Entry::Vacant(_) => *QUEUE_START,
         }
     }
-    pub async fn update_initial_order_if_not_set(
+    pub async fn initial_setup_if_not_yet_done(
         &self,
         auction_id: u64,
         event_reader: &EventReader,
@@ -136,10 +153,36 @@ impl Orderbook {
                 .auction_data(U256::from(auction_id))
                 .call()
                 .await?;
+            let auctioning_token: Address = Address::from(auction_data.0);
+            let bidding_token: Address = Address::from(auction_data.1);
             let initial_order: Order = FromStr::from_str(&encode(&auction_data.3))?;
+            self.set_decimals_for_auctioning_token(event_reader, auctioning_token)
+                .await?;
+            self.set_decimals_for_bidding_token(event_reader, bidding_token)
+                .await?;
             let mut order_hashmap = self.initial_order.write().await;
             order_hashmap.insert(auction_id, initial_order);
         }
+        Ok(())
+    }
+    pub async fn set_decimals_for_auctioning_token(
+        &self,
+        event_reader: &EventReader,
+        token_address: Address,
+    ) -> Result<()> {
+        let erc20_contract = contracts::ERC20::at(&event_reader.web3, token_address);
+        let mut decimals = self.decimals_auctioning_token.write().await;
+        *decimals = Some(U256::from(erc20_contract.decimals().call().await?));
+        Ok(())
+    }
+    pub async fn set_decimals_for_bidding_token(
+        &self,
+        event_reader: &EventReader,
+        token_address: Address,
+    ) -> Result<()> {
+        let erc20_contract = contracts::ERC20::at(&event_reader.web3, token_address);
+        let mut decimals = self.decimals_bidding_token.write().await;
+        *decimals = Some(U256::from(erc20_contract.decimals().call().await?));
         Ok(())
     }
     pub async fn run_maintenance(
@@ -156,9 +199,20 @@ impl Orderbook {
             .unwrap_or(U256::zero());
         let mut last_considered_block = 0;
         for auction_id in 1..=(max_auction_id.low_u64()) {
-            self.update_initial_order_if_not_set(auction_id, event_reader)
+            match self
+                .initial_setup_if_not_yet_done(auction_id, event_reader)
                 .await
-                .expect("update_initial_order_if_not_set was not successful");
+            {
+                Err(err) => {
+                    tracing::info!(
+                        "update_initial_order_if_not_set was not successful for auction_id {:?} with error: {:}",
+                        auction_id,
+                        err
+                    );
+                    break;
+                }
+                _ => (),
+            };
             let (new_orders, last_considered_block_from_events) = event_reader
                 .get_newly_placed_orders(last_block_considered, auction_id, reorg_protection)
                 .await

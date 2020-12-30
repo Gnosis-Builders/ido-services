@@ -20,5 +20,11 @@ pub async fn get_order_book_display_data(
     orderbook: Arc<Orderbook>,
 ) -> Result<impl warp::Reply, Infallible> {
     let orderbook_data = orderbook.get_order_book_display(auction_id).await;
-    Ok(with_status(json(&orderbook_data), StatusCode::OK))
+    match orderbook_data {
+        Err(err) => Ok(with_status(
+            json(&format!("{:}", err)),
+            StatusCode::BAD_REQUEST,
+        )),
+        Ok(orderbook_data) => Ok(with_status(json(&orderbook_data), StatusCode::OK)),
+    }
 }

@@ -8,7 +8,7 @@ use web3::Web3;
 
 pub struct EventReader {
     pub contract: EasyAuction,
-    web3: Web3<web3::transports::Http>,
+    pub web3: Web3<web3::transports::Http>,
 }
 
 const BLOCK_CONFIRMATION_COUNT: u64 = 10;
