@@ -150,8 +150,8 @@ impl Orderbook {
                 .auction_data(U256::from(auction_id))
                 .call()
                 .await?;
-            let auctioning_token: Address = Address::from(auction_data.0);
-            let bidding_token: Address = Address::from(auction_data.1);
+            let auctioning_token: Address = auction_data.0;
+            let bidding_token: Address = auction_data.1;
             let initial_order: Order = FromStr::from_str(&encode(&auction_data.3))?;
             self.set_decimals_for_auctioning_token(auction_id, event_reader, auctioning_token)
                 .await?;
@@ -204,19 +204,16 @@ impl Orderbook {
             .unwrap_or(U256::zero());
         let mut last_considered_block = 0;
         for auction_id in 1..=(max_auction_id.low_u64()) {
-            match self
+            if let Err(err) = self
                 .initial_setup_if_not_yet_done(auction_id, event_reader)
                 .await
             {
-                Err(err) => {
-                    tracing::info!(
+                tracing::info!(
                         "update_initial_order_if_not_set was not successful for auction_id {:?} with error: {:}",
                         auction_id,
                         err
                     );
-                    break;
-                }
-                _ => (),
+                break;
             };
             let new_orders: Vec<Order>;
             let last_considered_block_from_events: u64;
