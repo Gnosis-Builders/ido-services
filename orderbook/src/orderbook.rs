@@ -213,10 +213,25 @@ impl Orderbook {
                 }
                 _ => (),
             };
-            let (new_orders, last_considered_block_from_events) = event_reader
+            let new_orders: Vec<Order>;
+            let last_considered_block_from_events: u64;
+            match event_reader
                 .get_newly_placed_orders(last_block_considered, auction_id, reorg_protection)
                 .await
-                .expect("Could not get new orders");
+            {
+                Ok((orders, last_considered_block)) => {
+                    new_orders = orders;
+                    last_considered_block_from_events = last_considered_block;
+                }
+                Err(err) => {
+                    tracing::info!(
+                        "get_newly_placed_orders was not successful for auction_id {:?} with error: {:}",
+                        auction_id,
+                        err
+                    );
+                    break;
+                }
+            }
             last_considered_block =
                 std::cmp::min(last_considered_block_from_events, last_considered_block);
             if last_considered_block == 0 {
