@@ -13,8 +13,8 @@ use tokio::sync::RwLock;
 pub struct Orderbook {
     pub orders: RwLock<HashMap<u64, Vec<Order>>>,
     pub initial_order: RwLock<HashMap<u64, Order>>,
-    pub decimals_auctioning_token: RwLock<Option<U256>>,
-    pub decimals_bidding_token: RwLock<Option<U256>>,
+    pub decimals_auctioning_token: RwLock<HashMap<u64, U256>>,
+    pub decimals_bidding_token: RwLock<HashMap<u64, U256>>,
 }
 lazy_static! {
     pub static ref QUEUE_START: Order = Order {
@@ -22,7 +22,6 @@ lazy_static! {
         sell_amount: U256::from_dec_str("1").unwrap(),
         user_id: 0 as u64,
     };
-    pub static ref EIGHTEEN: U256 = U256::from_dec_str("18").unwrap();
 }
 impl Orderbook {
     #[allow(dead_code)]
@@ -30,8 +29,8 @@ impl Orderbook {
         Orderbook {
             orders: RwLock::new(HashMap::new()),
             initial_order: RwLock::new(HashMap::new()),
-            decimals_auctioning_token: RwLock::new(None),
-            decimals_bidding_token: RwLock::new(None),
+            decimals_auctioning_token: RwLock::new(HashMap::new()),
+            decimals_bidding_token: RwLock::new(HashMap::new()),
         }
     }
     #[allow(dead_code)]
@@ -62,7 +61,6 @@ impl Orderbook {
         let order_hashmap = self.initial_order.read().await;
         order_hashmap.contains_key(&auction_id)
     }
-    #[allow(dead_code)]
     pub async fn sort_orders(&mut self, auction_id: u64) {
         let mut hashmap = self.orders.write().await;
         match hashmap.entry(auction_id) {
@@ -85,22 +83,21 @@ impl Orderbook {
     }
     pub async fn get_order_book_display(&self, auction_id: u64) -> Result<OrderbookDisplay> {
         let orders_hashmap = self.orders.write().await;
-        let decimals_auctioning_token = self
-            .decimals_auctioning_token
-            .read()
-            .await
+        let reading_guard = self.decimals_auctioning_token.read().await;
+        let decimals_auctioning_token = reading_guard
+            .get(&auction_id)
             .expect("auction not yet initialized in backend");
-        let decimals_bidding_token = self
-            .decimals_bidding_token
-            .read()
-            .await
+        let reading_guard = self.decimals_bidding_token.read().await;
+
+        let decimals_bidding_token = reading_guard
+            .get(&auction_id)
             .expect("auction not yet initialized in backend");
         let bids: Vec<PricePoint>;
         if let Some(orders) = orders_hashmap.get(&auction_id) {
             bids = orders
                 .iter()
                 .map(|order| {
-                    order.to_price_point(decimals_auctioning_token, decimals_bidding_token)
+                    order.to_price_point(*decimals_auctioning_token, *decimals_bidding_token)
                 })
                 .collect();
         } else {
@@ -115,7 +112,7 @@ impl Orderbook {
                 buy_amount: order.sell_amount,
                 user_id: order.user_id,
             })
-            .map(|order| order.to_price_point(decimals_auctioning_token, decimals_bidding_token))
+            .map(|order| order.to_price_point(*decimals_auctioning_token, *decimals_bidding_token))
             .collect();
         Ok(OrderbookDisplay { asks, bids })
     }
@@ -156,9 +153,9 @@ impl Orderbook {
             let auctioning_token: Address = Address::from(auction_data.0);
             let bidding_token: Address = Address::from(auction_data.1);
             let initial_order: Order = FromStr::from_str(&encode(&auction_data.3))?;
-            self.set_decimals_for_auctioning_token(event_reader, auctioning_token)
+            self.set_decimals_for_auctioning_token(auction_id, event_reader, auctioning_token)
                 .await?;
-            self.set_decimals_for_bidding_token(event_reader, bidding_token)
+            self.set_decimals_for_bidding_token(auction_id, event_reader, bidding_token)
                 .await?;
             let mut order_hashmap = self.initial_order.write().await;
             order_hashmap.insert(auction_id, initial_order);
@@ -167,22 +164,30 @@ impl Orderbook {
     }
     pub async fn set_decimals_for_auctioning_token(
         &self,
+        auction_id: u64,
         event_reader: &EventReader,
         token_address: Address,
     ) -> Result<()> {
         let erc20_contract = contracts::ERC20::at(&event_reader.web3, token_address);
         let mut decimals = self.decimals_auctioning_token.write().await;
-        *decimals = Some(U256::from(erc20_contract.decimals().call().await?));
+        decimals.insert(
+            auction_id,
+            U256::from(erc20_contract.decimals().call().await?),
+        );
         Ok(())
     }
     pub async fn set_decimals_for_bidding_token(
         &self,
+        auction_id: u64,
         event_reader: &EventReader,
         token_address: Address,
     ) -> Result<()> {
         let erc20_contract = contracts::ERC20::at(&event_reader.web3, token_address);
         let mut decimals = self.decimals_bidding_token.write().await;
-        *decimals = Some(U256::from(erc20_contract.decimals().call().await?));
+        decimals.insert(
+            auction_id,
+            U256::from(erc20_contract.decimals().call().await?),
+        );
         Ok(())
     }
     pub async fn run_maintenance(
