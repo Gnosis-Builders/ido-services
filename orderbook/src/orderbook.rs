@@ -33,15 +33,14 @@ impl Orderbook {
             decimals_bidding_token: RwLock::new(HashMap::new()),
         }
     }
-    #[allow(dead_code)]
-    pub async fn insert_order(&mut self, auction_id: u64, order: Order) {
+    pub async fn insert_orders(&self, auction_id: u64, orders: Vec<Order>) {
         let mut hashmap = self.orders.write().await;
         match hashmap.entry(auction_id) {
             Entry::Occupied(mut order_vec) => {
-                order_vec.get_mut().push(order);
+                order_vec.get_mut().extend(orders);
             }
             Entry::Vacant(_) => {
-                hashmap.insert(auction_id, vec![order]);
+                hashmap.insert(auction_id, orders);
             }
         }
     }
@@ -70,12 +69,11 @@ impl Orderbook {
             Entry::Vacant(_) => {}
         }
     }
-    #[allow(dead_code)]
-    pub async fn remove_order(&mut self, auction_id: u64, order: Order) -> bool {
+    pub async fn remove_orders(&self, auction_id: u64, orders: Vec<Order>) -> bool {
         let mut hashmap = self.orders.write().await;
         match hashmap.entry(auction_id) {
             Entry::Occupied(order_vec) => {
-                order_vec.into_mut().retain(|x| *x != order);
+                order_vec.into_mut().retain(|x| !orders.contains(x));
                 true
             }
             Entry::Vacant(_) => false,
@@ -193,16 +191,15 @@ impl Orderbook {
     pub async fn run_maintenance(
         &self,
         event_reader: &EventReader,
-        last_block_considered: u64,
+        last_block_considered_per_auction_id: &mut HashMap<u64, u64>,
         reorg_protection: bool,
-    ) -> Result<u64> {
+    ) -> Result<()> {
         let max_auction_id = event_reader
             .contract
             .auction_counter()
             .call()
             .await
             .unwrap_or(U256::zero());
-        let mut last_considered_block = 0;
         for auction_id in 1..=(max_auction_id.low_u64()) {
             if let Err(err) = self
                 .initial_setup_if_not_yet_done(auction_id, event_reader)
@@ -216,39 +213,33 @@ impl Orderbook {
                 break;
             };
             let new_orders: Vec<Order>;
-            let last_considered_block_from_events: u64;
+            let canceled_orders: Vec<Order>;
+            let last_block_considered = *last_block_considered_per_auction_id
+                .get(&auction_id)
+                .unwrap_or(&(7789300 as u64));
             match event_reader
-                .get_newly_placed_orders(last_block_considered, auction_id, reorg_protection)
+                .get_order_updates(last_block_considered, auction_id, reorg_protection)
                 .await
             {
-                Ok((orders, last_considered_block)) => {
-                    new_orders = orders;
-                    last_considered_block_from_events = last_considered_block;
+                Ok(order_updates) => {
+                    new_orders = order_updates.orders_added;
+                    canceled_orders = order_updates.orders_removed;
+                    last_block_considered_per_auction_id
+                        .insert(auction_id, order_updates.last_block_handled);
                 }
                 Err(err) => {
                     tracing::info!(
-                        "get_newly_placed_orders was not successful for auction_id {:?} with error: {:}",
+                        "get_order_updates was not successful for auction_id {:?} with error: {:}",
                         auction_id,
                         err
                     );
                     break;
                 }
             }
-            last_considered_block =
-                std::cmp::min(last_considered_block_from_events, last_considered_block);
-            if last_considered_block == 0 {
-                last_considered_block = last_considered_block_from_events;
-            }
-            let mut orders = self.orders.write().await;
-            let entry = orders.entry(auction_id);
-            match entry {
-                Entry::Occupied(orders) => orders.into_mut().extend(new_orders),
-                Entry::Vacant(empty_vec) => {
-                    empty_vec.insert(new_orders);
-                }
-            }
+            self.insert_orders(auction_id, new_orders).await;
+            self.remove_orders(auction_id, canceled_orders).await;
         }
-        Ok(last_considered_block + 1)
+        Ok(())
     }
 }
 
@@ -267,7 +258,7 @@ mod tests {
         };
         let auction_id = 1;
         let mut orderbook = Orderbook::new();
-        orderbook.insert_order(auction_id, order).await;
+        orderbook.insert_orders(auction_id, vec![order]).await;
         assert_eq!(orderbook.get_orders(auction_id).await, vec![order]);
     }
 
@@ -280,13 +271,13 @@ mod tests {
         };
         let auction_id = 1;
         let mut orderbook = Orderbook::new();
-        orderbook.insert_order(auction_id, order_1).await;
+        orderbook.insert_orders(auction_id, vec![order_1]).await;
         let order_2 = Order {
             sell_amount: U256::from_dec_str("1230").unwrap(),
             buy_amount: U256::from_dec_str("12").unwrap(),
             user_id: 10 as u64,
         };
-        orderbook.insert_order(auction_id, order_2).await;
+        orderbook.insert_orders(auction_id, vec![order_2]).await;
         orderbook.sort_orders(auction_id).await;
         assert_eq!(
             orderbook.get_orders(auction_id).await,
@@ -302,12 +293,12 @@ mod tests {
             user_id: 10 as u64,
         };
         let auction_id = 1;
-        let mut orderbook = Orderbook::new();
+        let orderbook = Orderbook::new();
         assert_eq!(
             orderbook.get_previous_order(auction_id, order_1).await,
             *QUEUE_START
         );
-        orderbook.insert_order(auction_id, order_1).await;
+        orderbook.insert_orders(auction_id, vec![order_1]).await;
         let order_2 = Order {
             sell_amount: U256::from_dec_str("2").unwrap(),
             buy_amount: U256::from_dec_str("3").unwrap(),

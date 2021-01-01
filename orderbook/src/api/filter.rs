@@ -36,7 +36,7 @@ pub mod test_util {
 
     #[tokio::test]
     async fn get_previous_order_() {
-        let mut orderbook = Orderbook::default();
+        let orderbook = Orderbook::default();
         let auction_id: u64 = 1;
         let order_1 = Order {
             sell_amount: U256::from_dec_str("2").unwrap(),
@@ -48,7 +48,7 @@ pub mod test_util {
             buy_amount: U256::from_dec_str("3").unwrap(),
             user_id: 10 as u64,
         };
-        orderbook.insert_order(auction_id, order_1).await;
+        orderbook.insert_orders(auction_id, vec![order_1]).await;
         let filter = get_previous_order(Arc::new(orderbook));
         let response = request()
             .path(&format!("/get_previous_order/{:}/{:}", auction_id, order_2))

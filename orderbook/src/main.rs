@@ -2,6 +2,7 @@ use contracts::EasyAuction;
 use orderbook::event_reader::EventReader;
 use orderbook::orderbook::Orderbook;
 use orderbook::serve_task;
+use std::collections::HashMap;
 use std::num::ParseFloatError;
 use std::sync::Arc;
 use std::{net::SocketAddr, time::Duration};
@@ -46,13 +47,13 @@ pub async fn orderbook_maintenance(
     orderbook_reorg_protected: Arc<Orderbook>,
     event_reader: EventReader,
 ) -> ! {
-    let mut last_block_considered_for_reorg_protected_orderbook = 7789300;
+    let mut last_block_considered_for_reorg_protected_orderbook = HashMap::new();
     loop {
         tracing::debug!("running order book maintenance with reorg protection");
-        last_block_considered_for_reorg_protected_orderbook = orderbook_reorg_protected
+        orderbook_reorg_protected
             .run_maintenance(
                 &event_reader,
-                last_block_considered_for_reorg_protected_orderbook,
+                &mut last_block_considered_for_reorg_protected_orderbook,
                 true,
             )
             .await
@@ -71,7 +72,7 @@ pub async fn orderbook_maintenance(
         orderbook_latest
             .run_maintenance(
                 &event_reader,
-                last_block_considered_for_reorg_protected_orderbook,
+                &mut last_block_considered_for_reorg_protected_orderbook.clone(), // Values are cloned, as we don't wanna store the values.
                 false,
             )
             .await
