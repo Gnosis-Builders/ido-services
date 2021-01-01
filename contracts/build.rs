@@ -16,6 +16,7 @@ fn main() {
     println!("cargo:rerun-if-changed=build.rs");
 
     generate_contract("ERC20", hashmap! {});
+    generate_contract("ERC20Mintable", hashmap! {});
     generate_contract(
         "EasyAuction",
         hashmap! {
@@ -29,7 +30,7 @@ fn generate_contract(name: &str, deployment_overrides: HashMap<u32, Address>) {
     let address_file = paths::contract_address_file(name);
     let dest = env::var("OUT_DIR").unwrap();
 
-    println!("cargo:rerun-if-changed={}", artifact.display());
+    println!("test cargo:rerun-if-changed={}", artifact.display());
     let mut builder = Builder::new(artifact)
         .with_contract_name_override(Some(name))
         .with_visibility_modifier(Some("pub"))

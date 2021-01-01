@@ -16,6 +16,10 @@ const NPM_CONTRACTS: &[(&str, &str)] = &[
         "ERC20.json",
     ),
     (
+        "@openzeppelin/contracts@2.5.0/build/contracts/ERC20Mintable.json",
+        "ERC20Mintable.json",
+    ),
+    (
         "@gnosis.pm/ido-contracts@0.0.1-alpha.1/deployments/rinkeby/EasyAuction.json",
         "EasyAuction.json",
     ),
