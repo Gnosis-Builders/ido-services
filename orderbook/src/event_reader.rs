@@ -39,8 +39,7 @@ impl EventReader {
         );
         let orders = self
             .update_with_events_between_blocks(last_handled_block, to_block, auction_id)
-            .await
-            .expect("Orders could not be downloaded");
+            .await?;
         Ok((orders, to_block))
     }
 
