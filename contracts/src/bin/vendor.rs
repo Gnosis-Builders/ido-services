@@ -16,7 +16,7 @@ const NPM_CONTRACTS: &[(&str, &str)] = &[
         "ERC20.json",
     ),
     (
-        "@gnosis.pm/ido-contracts@0.0.1-alpha.1/deployments/rinkeby/EasyAuction.json",
+        "@gnosis.pm/ido-contracts@0.0.1-alpha.3/deployments/rinkeby/EasyAuction.json",
         "EasyAuction.json",
     ),
 ];
