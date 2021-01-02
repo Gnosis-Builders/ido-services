@@ -4,6 +4,7 @@ use ethcontract::Address;
 use hex::encode;
 use lazy_static::lazy_static;
 use model::order::{Order, OrderbookDisplay, PricePoint};
+use model::user::User;
 use primitive_types::U256;
 use std::collections::{hash_map::Entry, HashMap};
 use std::str::FromStr;
@@ -13,6 +14,7 @@ use tokio::sync::RwLock;
 pub struct Orderbook {
     pub orders: RwLock<HashMap<u64, Vec<Order>>>,
     pub initial_order: RwLock<HashMap<u64, Order>>,
+    pub users: RwLock<HashMap<Address, u64>>,
     pub decimals_auctioning_token: RwLock<HashMap<u64, U256>>,
     pub decimals_bidding_token: RwLock<HashMap<u64, U256>>,
 }
@@ -29,6 +31,7 @@ impl Orderbook {
         Orderbook {
             orders: RwLock::new(HashMap::new()),
             initial_order: RwLock::new(HashMap::new()),
+            users: RwLock::new(HashMap::new()),
             decimals_auctioning_token: RwLock::new(HashMap::new()),
             decimals_bidding_token: RwLock::new(HashMap::new()),
         }
@@ -42,6 +45,12 @@ impl Orderbook {
             Entry::Vacant(_) => {
                 hashmap.insert(auction_id, orders);
             }
+        }
+    }
+    pub async fn insert_users(&self, users: Vec<User>) {
+        let mut hashmap = self.users.write().await;
+        for user in users {
+            hashmap.insert(user.address, user.user_id);
         }
     }
     pub async fn get_initial_order(&self, auction_id: u64) -> Order {
@@ -150,7 +159,7 @@ impl Orderbook {
                 .await?;
             let auctioning_token: Address = auction_data.0;
             let bidding_token: Address = auction_data.1;
-            let initial_order: Order = FromStr::from_str(&encode(&auction_data.3))?;
+            let initial_order: Order = FromStr::from_str(&encode(&auction_data.4))?;
             self.set_decimals_for_auctioning_token(auction_id, event_reader, auctioning_token)
                 .await?;
             self.set_decimals_for_bidding_token(auction_id, event_reader, bidding_token)
@@ -214,6 +223,7 @@ impl Orderbook {
             };
             let new_orders: Vec<Order>;
             let canceled_orders: Vec<Order>;
+            let new_users: Vec<User>;
             let last_block_considered = *last_block_considered_per_auction_id
                 .get(&auction_id)
                 .unwrap_or(&(7789300 as u64));
@@ -224,6 +234,7 @@ impl Orderbook {
                 Ok(order_updates) => {
                     new_orders = order_updates.orders_added;
                     canceled_orders = order_updates.orders_removed;
+                    new_users = order_updates.users_added;
                     last_block_considered_per_auction_id
                         .insert(auction_id, order_updates.last_block_handled);
                 }
@@ -236,6 +247,7 @@ impl Orderbook {
                     break;
                 }
             }
+            self.insert_users(new_users).await;
             self.insert_orders(auction_id, new_orders).await;
             self.remove_orders(auction_id, canceled_orders).await;
         }

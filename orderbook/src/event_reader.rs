@@ -2,6 +2,8 @@ use anyhow::Result;
 use contracts::EasyAuction;
 use ethcontract::BlockNumber;
 use model::order::Order;
+use model::user::User;
+use primitive_types::H160;
 use primitive_types::U256;
 use tracing::info;
 use web3::Web3;
@@ -14,6 +16,7 @@ pub struct EventReader {
 pub struct OrderUpdates {
     pub orders_added: Vec<Order>,
     pub orders_removed: Vec<Order>,
+    pub users_added: Vec<User>,
     pub last_block_handled: u64,
 }
 
@@ -39,9 +42,13 @@ impl EventReader {
         let orders_removed = self
             .get_cancellations_between_blocks(last_handled_block, to_block, auction_id)
             .await?;
+        let users_added = self
+            .get_new_users_between_blocks(last_handled_block, to_block)
+            .await?;
         Ok(OrderUpdates {
             orders_added,
             orders_removed,
+            users_added,
             last_block_handled: to_block,
         })
     }
@@ -71,6 +78,30 @@ impl EventReader {
             orders.push(order);
         }
         Ok(orders)
+    }
+
+    async fn get_new_users_between_blocks(
+        &self,
+        from_block: u64,
+        to_block: u64,
+    ) -> Result<Vec<User>> {
+        let mut users = Vec::new();
+        let events = self
+            .contract
+            .events()
+            .new_user()
+            .from_block(BlockNumber::Number(from_block.into()))
+            .to_block(BlockNumber::Number(to_block.into()))
+            .query()
+            .await?;
+        for event in events {
+            let user = User {
+                address: H160::from(event.data.user_address),
+                user_id: event.data.user_id,
+            };
+            users.push(user);
+        }
+        Ok(users)
     }
 
     async fn get_to_block(
