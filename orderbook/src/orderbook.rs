@@ -141,7 +141,7 @@ impl Orderbook {
         current_orders
             .iter()
             .filter(|order| order.user_id == user_id)
-            .map(|order| *order)
+            .copied()
             .collect()
     }
     pub async fn get_previous_order(&self, auction_id: u64, order: Order) -> Order {

@@ -71,7 +71,7 @@ pub async fn orderbook_maintenance(
             let mut users = orderbook_latest.users.write().await;
             let users_reorg_save = orderbook_reorg_protected.users.read().await;
             for address in users_reorg_save.keys() {
-                users.insert(*address, users_reorg_save.get(address).unwrap().clone());
+                users.insert(*address, *users_reorg_save.get(address).unwrap());
             }
         }
         orderbook_latest

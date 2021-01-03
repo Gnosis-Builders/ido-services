@@ -3,7 +3,6 @@ use contracts::EasyAuction;
 use ethcontract::BlockNumber;
 use model::order::Order;
 use model::user::User;
-use primitive_types::H160;
 use primitive_types::U256;
 use tracing::info;
 use web3::Web3;
@@ -33,17 +32,17 @@ impl EventReader {
         auction_id: u64,
         reorg_protection: bool,
     ) -> Result<OrderUpdates> {
-        let to_block = self
+        let (from_block, to_block) = self
             .get_to_block(last_handled_block, auction_id, reorg_protection)
             .await?;
         let orders_added = self
-            .get_order_placements_between_blocks(last_handled_block, to_block, auction_id)
+            .get_order_placements_between_blocks(from_block, to_block, auction_id)
             .await?;
         let orders_removed = self
-            .get_cancellations_between_blocks(last_handled_block, to_block, auction_id)
+            .get_cancellations_between_blocks(from_block, to_block, auction_id)
             .await?;
         let users_added = self
-            .get_new_users_between_blocks(last_handled_block, to_block)
+            .get_new_users_between_blocks(from_block, to_block)
             .await?;
         Ok(OrderUpdates {
             orders_added,
@@ -96,7 +95,7 @@ impl EventReader {
             .await?;
         for event in events {
             let user = User {
-                address: H160::from(event.data.user_address),
+                address: event.data.user_address,
                 user_id: event.data.user_id,
             };
             users.push(user);
@@ -109,7 +108,7 @@ impl EventReader {
         last_handled_block: u64,
         auction_id: u64,
         reorg_protection: bool,
-    ) -> Result<u64> {
+    ) -> Result<(u64, u64)> {
         let current_block = self.web3.eth().block_number().await?.as_u64();
         let mut to_block = current_block;
         if reorg_protection {
@@ -123,7 +122,7 @@ impl EventReader {
             "Updating event based orderbook from block {} to block {} for auctionId {}.",
             from_block, to_block, auction_id,
         );
-        Ok(to_block)
+        Ok((from_block, to_block))
     }
 
     async fn get_cancellations_between_blocks(
