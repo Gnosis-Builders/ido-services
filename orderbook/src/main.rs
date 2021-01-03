@@ -68,6 +68,17 @@ pub async fn orderbook_maintenance(
                     orderbook_reorg_save.get(auction_id).unwrap().clone(),
                 );
             }
+            let mut orderbook = orderbook_latest.orders_without_claimed.write().await;
+            let orderbook_reorg_save = orderbook_reorg_protected
+                .orders_without_claimed
+                .read()
+                .await;
+            for auction_id in orderbook_reorg_save.keys() {
+                orderbook.insert(
+                    *auction_id,
+                    orderbook_reorg_save.get(auction_id).unwrap().clone(),
+                );
+            }
             let mut users = orderbook_latest.users.write().await;
             let users_reorg_save = orderbook_reorg_protected.users.read().await;
             for address in users_reorg_save.keys() {

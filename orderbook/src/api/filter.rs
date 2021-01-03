@@ -40,6 +40,15 @@ pub fn get_user_orders(
         .and_then(handler::get_user_orders)
 }
 
+pub fn get_user_orders_without_claimed(
+    orderbook: Arc<Orderbook>,
+) -> impl Filter<Extract = (impl warp::Reply,), Error = warp::Rejection> + Clone {
+    warp::path!("get_user_orders_without_claimed" / u64 / H160Wrapper)
+        .and(warp::get())
+        .and(with_orderbook(orderbook))
+        .and_then(handler::get_user_orders_without_claimed)
+}
+
 pub fn get_order_book_display_data(
     orderbook: Arc<Orderbook>,
 ) -> impl Filter<Extract = (impl warp::Reply,), Error = warp::Rejection> + Clone {
