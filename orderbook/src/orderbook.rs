@@ -5,6 +5,7 @@ use hex::encode;
 use lazy_static::lazy_static;
 use model::order::{Order, OrderbookDisplay, PricePoint};
 use model::user::User;
+use primitive_types::H160;
 use primitive_types::U256;
 use std::collections::{hash_map::Entry, HashMap};
 use std::str::FromStr;
@@ -130,6 +131,18 @@ impl Orderbook {
             Entry::Occupied(order_vec) => order_vec.get().clone(),
             Entry::Vacant(_) => Vec::new(),
         }
+    }
+    pub async fn get_user_orders(&self, auction_id: u64, user: H160) -> Vec<Order> {
+        let hashmap = self.users.read().await;
+        let user_id = *hashmap.get(&user).unwrap_or(&(0 as u64));
+        let hashmap = self.orders.read().await;
+        let empty_vec = Vec::new();
+        let current_orders = hashmap.get(&auction_id).unwrap_or(&empty_vec);
+        current_orders
+            .iter()
+            .filter(|order| order.user_id == user_id)
+            .map(|order| *order)
+            .collect()
     }
     pub async fn get_previous_order(&self, auction_id: u64, order: Order) -> Order {
         let mut order_hashmap = self.orders.write().await;

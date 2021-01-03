@@ -1,3 +1,4 @@
+use crate::api::filter::H160Wrapper;
 use crate::orderbook::Orderbook;
 use model::order::Order;
 use std::{convert::Infallible, sync::Arc};
@@ -12,6 +13,15 @@ pub async fn get_previous_order(
     orderbook: Arc<Orderbook>,
 ) -> Result<impl warp::Reply, Infallible> {
     let order = orderbook.get_previous_order(auction_id, order).await;
+    Ok(with_status(json(&order), StatusCode::OK))
+}
+
+pub async fn get_user_orders(
+    auction_id: u64,
+    user: H160Wrapper,
+    orderbook: Arc<Orderbook>,
+) -> Result<impl warp::Reply, Infallible> {
+    let order = orderbook.get_user_orders(auction_id, user.0).await;
     Ok(with_status(json(&order), StatusCode::OK))
 }
 
