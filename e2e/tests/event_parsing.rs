@@ -1,7 +1,9 @@
 use contracts::{ERC20Mintable, EasyAuction};
 use ethcontract::prelude::{Account, Address, Http, Web3, U256};
+use model::order::PricePoint;
 use orderbook::event_reader::EventReader;
 use orderbook::orderbook::{Orderbook, QUEUE_START};
+use serde_json::Value;
 use std::{str::FromStr, sync::Arc};
 
 const NODE_HOST: &str = "http://127.0.0.1:8545";
@@ -19,7 +21,7 @@ async fn test_with_ganache() {
     let trader_a = Account::Local(accounts[1], None);
 
     let deploy_mintable_token = || async {
-        ERC20Mintable::builder(&web3)
+        ERC20Mintable::builder(&web3, String::from("TEST"), String::from("18"))
             .gas(8_000_000u32.into())
             .deploy()
             .await
@@ -62,6 +64,7 @@ async fn test_with_ganache() {
             token_a.address(),
             token_b.address(),
             U256::from_str("3600").unwrap(),
+            U256::from_str("3600").unwrap(),
             (10 as u128).checked_pow(18).unwrap(),
             (10 as u128).checked_pow(18).unwrap(),
             U256::from_str("1").unwrap()
@@ -100,10 +103,11 @@ async fn test_with_ganache() {
         API_HOST[7..].parse().expect("Couldn't parse API address"),
     );
     let event_reader = EventReader::new(easy_auction, web3);
+    let mut last_block_considered_hashmap = std::collections::HashMap::new();
     orderbook::orderbook::Orderbook::run_maintenance(
         &orderbook,
         &event_reader,
-        &mut std::collections::HashMap::new(),
+        &mut last_block_considered_hashmap,
         false,
     )
     .await
@@ -116,8 +120,38 @@ async fn test_with_ganache() {
             API_HOST, ORDERBOOK_DISPLAY_ENDPOINT, auction_id
         ))
         .send()
-        .await;
-    assert_eq!(orderbook_display.unwrap().status(), 201);
+        .await
+        .unwrap();
+    let orderbook_value: Value =
+        serde_json::from_str(&orderbook_display.text().await.unwrap()).unwrap();
+    let expected_price_point = PricePoint {
+        price: 2.0 as f64,
+        volume: 2.0 as f64,
+    };
+    let bids: Vec<PricePoint> = serde_json::from_value(orderbook_value["bids"].clone()).unwrap();
+    assert_eq!(bids, vec![expected_price_point]);
+
+    //rerunning the maintenance function should not change the result
+
+    orderbook::orderbook::Orderbook::run_maintenance(
+        &orderbook,
+        &event_reader,
+        &mut last_block_considered_hashmap,
+        false,
+    )
+    .await
+    .unwrap();
+    let orderbook_display = client
+        .get(&format!(
+            "{}{}{}",
+            API_HOST, ORDERBOOK_DISPLAY_ENDPOINT, auction_id
+        ))
+        .send()
+        .await
+        .unwrap();
+    let orderbook: Value = serde_json::from_str(&orderbook_display.text().await.unwrap()).unwrap();
+    let bids: Vec<PricePoint> = serde_json::from_value(orderbook["bids"].clone()).unwrap();
+    assert_eq!(bids, vec![expected_price_point]);
 }
 
 fn to_wei(base: u32) -> U256 {

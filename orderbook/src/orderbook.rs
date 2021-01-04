@@ -284,7 +284,7 @@ impl Orderbook {
             let new_users: Vec<User>;
             let last_block_considered = *last_block_considered_per_auction_id
                 .get(&auction_id)
-                .unwrap_or(&(7789300 as u64));
+                .unwrap_or(&(1 as u64));
             match event_reader
                 .get_order_updates(last_block_considered, auction_id, reorg_protection)
                 .await
