@@ -16,6 +16,7 @@ fn main() {
     println!("cargo:rerun-if-changed=build.rs");
 
     generate_contract("ERC20", hashmap! {});
+    generate_contract("ERC20Mintable", hashmap! {});
     generate_contract(
         "EasyAuction",
         hashmap! {

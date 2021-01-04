@@ -20,15 +20,22 @@ pub struct OrderbookDisplay {
     pub asks: Vec<PricePoint>,
     pub bids: Vec<PricePoint>,
 }
-#[derive(Default, Debug, Clone, Copy, Serialize)]
+#[derive(Default, Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct PricePoint {
-    price: f64,
-    volume: f64,
+    pub price: f64,
+    pub volume: f64,
 }
 lazy_static! {
     pub static ref TEN: U256 = U256::from_dec_str("10").unwrap();
     pub static ref EIGHTEEN: U256 = U256::from_dec_str("18").unwrap();
 }
+impl PartialEq for PricePoint {
+    fn eq(&self, other: &Self) -> bool {
+        float_cmp::approx_eq!(f64, self.volume, other.volume, ulps = 2)
+            && float_cmp::approx_eq!(f64, self.price, other.price, ulps = 2)
+    }
+}
+impl Eq for PricePoint {}
 impl Order {
     pub fn to_price_point(
         &self,
@@ -184,18 +191,10 @@ mod tests {
             price: 10_f64 / 11_f64,
             volume: 100.0_f64,
         };
-        assert!(float_cmp::approx_eq!(
-            f64,
-            normal_order.to_price_point(*EIGHTEEN, *EIGHTEEN).price,
-            expected_price_point.price,
-            ulps = 2
-        ));
-        assert!(float_cmp::approx_eq!(
-            f64,
-            normal_order.to_price_point(*EIGHTEEN, *EIGHTEEN).volume,
-            expected_price_point.volume,
-            ulps = 2
-        ));
+        assert_eq!(
+            normal_order.to_price_point(*EIGHTEEN, *EIGHTEEN),
+            expected_price_point
+        );
     }
     #[test]
     fn to_price_point_without_18_digits() {
@@ -206,23 +205,11 @@ mod tests {
         };
         let expected_price_point = PricePoint {
             price: 10_f64 / (11_f64 * 10_f64.powi(12)),
-            volume: 100.0_f64 * 10_f64.powi(12),
+            volume: 100.0_f64,
         };
-        assert!(float_cmp::approx_eq!(
-            f64,
-            normal_order
-                .to_price_point(U256::from("6"), *EIGHTEEN)
-                .price,
-            expected_price_point.price,
-            ulps = 2
-        ));
-        assert!(float_cmp::approx_eq!(
-            f64,
-            normal_order
-                .to_price_point(*EIGHTEEN, U256::from("6"))
-                .volume,
-            expected_price_point.volume,
-            ulps = 2
-        ));
+        assert_eq!(
+            normal_order.to_price_point(U256::from("6"), *EIGHTEEN),
+            expected_price_point
+        );
     }
 }
