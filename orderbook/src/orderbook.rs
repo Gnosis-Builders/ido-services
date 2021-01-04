@@ -4,6 +4,8 @@ use ethcontract::Address;
 use hex::encode;
 use lazy_static::lazy_static;
 use model::order::{Order, OrderbookDisplay, PricePoint};
+use model::user::User;
+use primitive_types::H160;
 use primitive_types::U256;
 use std::collections::{hash_map::Entry, HashMap};
 use std::str::FromStr;
@@ -12,7 +14,9 @@ use tokio::sync::RwLock;
 #[derive(Default, Debug)]
 pub struct Orderbook {
     pub orders: RwLock<HashMap<u64, Vec<Order>>>,
+    pub orders_without_claimed: RwLock<HashMap<u64, Vec<Order>>>,
     pub initial_order: RwLock<HashMap<u64, Order>>,
+    pub users: RwLock<HashMap<Address, u64>>,
     pub decimals_auctioning_token: RwLock<HashMap<u64, U256>>,
     pub decimals_bidding_token: RwLock<HashMap<u64, U256>>,
 }
@@ -28,20 +32,41 @@ impl Orderbook {
     pub fn new() -> Self {
         Orderbook {
             orders: RwLock::new(HashMap::new()),
+            orders_without_claimed: RwLock::new(HashMap::new()),
             initial_order: RwLock::new(HashMap::new()),
+            users: RwLock::new(HashMap::new()),
             decimals_auctioning_token: RwLock::new(HashMap::new()),
             decimals_bidding_token: RwLock::new(HashMap::new()),
         }
     }
     pub async fn insert_orders(&self, auction_id: u64, orders: Vec<Order>) {
-        let mut hashmap = self.orders.write().await;
-        match hashmap.entry(auction_id) {
-            Entry::Occupied(mut order_vec) => {
-                order_vec.get_mut().extend(orders);
+        {
+            let mut hashmap = self.orders.write().await;
+            match hashmap.entry(auction_id) {
+                Entry::Occupied(mut order_vec) => {
+                    order_vec.get_mut().extend(orders.clone());
+                }
+                Entry::Vacant(_) => {
+                    hashmap.insert(auction_id, orders.clone());
+                }
             }
-            Entry::Vacant(_) => {
-                hashmap.insert(auction_id, orders);
+        }
+        {
+            let mut hashmap = self.orders_without_claimed.write().await;
+            match hashmap.entry(auction_id) {
+                Entry::Occupied(mut order_vec) => {
+                    order_vec.get_mut().extend(orders);
+                }
+                Entry::Vacant(_) => {
+                    hashmap.insert(auction_id, orders);
+                }
             }
+        }
+    }
+    pub async fn insert_users(&self, users: Vec<User>) {
+        let mut hashmap = self.users.write().await;
+        for user in users {
+            hashmap.insert(user.address, user.user_id);
         }
     }
     pub async fn get_initial_order(&self, auction_id: u64) -> Order {
@@ -69,8 +94,28 @@ impl Orderbook {
             Entry::Vacant(_) => {}
         }
     }
-    pub async fn remove_orders(&self, auction_id: u64, orders: Vec<Order>) -> bool {
-        let mut hashmap = self.orders.write().await;
+    pub async fn remove_orders(&self, auction_id: u64, orders: Vec<Order>) {
+        {
+            let mut hashmap = self.orders.write().await;
+            match hashmap.entry(auction_id) {
+                Entry::Occupied(order_vec) => {
+                    order_vec.into_mut().retain(|x| !orders.contains(x));
+                }
+                Entry::Vacant(_) => (),
+            }
+        }
+        {
+            let mut hashmap = self.orders_without_claimed.write().await;
+            match hashmap.entry(auction_id) {
+                Entry::Occupied(order_vec) => {
+                    order_vec.into_mut().retain(|x| !orders.contains(x));
+                }
+                Entry::Vacant(_) => (),
+            }
+        }
+    }
+    pub async fn remove_claimed_orders(&self, auction_id: u64, orders: Vec<Order>) -> bool {
+        let mut hashmap = self.orders_without_claimed.write().await;
         match hashmap.entry(auction_id) {
             Entry::Occupied(order_vec) => {
                 order_vec.into_mut().retain(|x| !orders.contains(x));
@@ -122,20 +167,41 @@ impl Orderbook {
             Entry::Vacant(_) => Vec::new(),
         }
     }
+    pub async fn get_user_orders(&self, auction_id: u64, user: H160) -> Vec<Order> {
+        let hashmap = self.users.read().await;
+        let user_id = *hashmap.get(&user).unwrap_or(&(0 as u64));
+        let hashmap = self.orders.read().await;
+        let empty_vec = Vec::new();
+        let current_orders = hashmap.get(&auction_id).unwrap_or(&empty_vec);
+        current_orders
+            .iter()
+            .filter(|order| order.user_id == user_id)
+            .copied()
+            .collect()
+    }
+    pub async fn get_user_orders_without_claimed(&self, auction_id: u64, user: H160) -> Vec<Order> {
+        let hashmap = self.users.read().await;
+        let user_id = *hashmap.get(&user).unwrap_or(&(0 as u64));
+        let hashmap = self.orders_without_claimed.read().await;
+        let empty_vec = Vec::new();
+        let current_orders = hashmap.get(&auction_id).unwrap_or(&empty_vec);
+        current_orders
+            .iter()
+            .filter(|order| order.user_id == user_id)
+            .copied()
+            .collect()
+    }
     pub async fn get_previous_order(&self, auction_id: u64, order: Order) -> Order {
-        let mut order_hashmap = self.orders.write().await;
-        match order_hashmap.entry(auction_id) {
-            Entry::Occupied(order_vec) => {
-                let mut smaller_order: Order = *QUEUE_START;
-                for order_from_vec in order_vec.get() {
-                    if order_from_vec < &order {
-                        smaller_order = *order_from_vec;
-                    }
-                }
-                smaller_order
+        let order_hashmap = self.orders_without_claimed.read().await;
+        let empty_order_vec = Vec::new();
+        let order_vec = order_hashmap.get(&auction_id).unwrap_or(&empty_order_vec);
+        let mut smaller_order: Order = *QUEUE_START;
+        for order_from_vec in order_vec {
+            if order_from_vec < &order {
+                smaller_order = *order_from_vec;
             }
-            Entry::Vacant(_) => *QUEUE_START,
         }
+        smaller_order
     }
     pub async fn initial_setup_if_not_yet_done(
         &self,
@@ -150,7 +216,7 @@ impl Orderbook {
                 .await?;
             let auctioning_token: Address = auction_data.0;
             let bidding_token: Address = auction_data.1;
-            let initial_order: Order = FromStr::from_str(&encode(&auction_data.3))?;
+            let initial_order: Order = FromStr::from_str(&encode(&auction_data.4))?;
             self.set_decimals_for_auctioning_token(auction_id, event_reader, auctioning_token)
                 .await?;
             self.set_decimals_for_bidding_token(auction_id, event_reader, bidding_token)
@@ -205,7 +271,7 @@ impl Orderbook {
                 .initial_setup_if_not_yet_done(auction_id, event_reader)
                 .await
             {
-                tracing::info!(
+                tracing::error!(
                         "update_initial_order_if_not_set was not successful for auction_id {:?} with error: {:}",
                         auction_id,
                         err
@@ -214,6 +280,8 @@ impl Orderbook {
             };
             let new_orders: Vec<Order>;
             let canceled_orders: Vec<Order>;
+            let new_claimed_orders: Vec<Order>;
+            let new_users: Vec<User>;
             let last_block_considered = *last_block_considered_per_auction_id
                 .get(&auction_id)
                 .unwrap_or(&(7789300 as u64));
@@ -224,6 +292,8 @@ impl Orderbook {
                 Ok(order_updates) => {
                     new_orders = order_updates.orders_added;
                     canceled_orders = order_updates.orders_removed;
+                    new_claimed_orders = order_updates.orders_claimed;
+                    new_users = order_updates.users_added;
                     last_block_considered_per_auction_id
                         .insert(auction_id, order_updates.last_block_handled);
                 }
@@ -236,8 +306,11 @@ impl Orderbook {
                     break;
                 }
             }
+            self.insert_users(new_users).await;
             self.insert_orders(auction_id, new_orders).await;
             self.remove_orders(auction_id, canceled_orders).await;
+            self.remove_claimed_orders(auction_id, new_claimed_orders)
+                .await;
         }
         Ok(())
     }
@@ -298,15 +371,32 @@ mod tests {
             orderbook.get_previous_order(auction_id, order_1).await,
             *QUEUE_START
         );
-        orderbook.insert_orders(auction_id, vec![order_1]).await;
         let order_2 = Order {
             sell_amount: U256::from_dec_str("2").unwrap(),
             buy_amount: U256::from_dec_str("3").unwrap(),
             user_id: 10 as u64,
         };
+        let order_3 = Order {
+            sell_amount: U256::from_dec_str("2").unwrap(),
+            buy_amount: U256::from_dec_str("3").unwrap(),
+            user_id: 9 as u64,
+        };
+        orderbook
+            .insert_orders(auction_id, vec![order_1, order_3])
+            .await;
+        orderbook
+            .remove_claimed_orders(auction_id, vec![order_3])
+            .await;
         assert_eq!(
             orderbook.get_previous_order(auction_id, order_2).await,
             order_1
+        );
+        orderbook
+            .remove_claimed_orders(auction_id, vec![order_1])
+            .await;
+        assert_eq!(
+            orderbook.get_previous_order(auction_id, order_2).await,
+            *QUEUE_START
         );
     }
 }

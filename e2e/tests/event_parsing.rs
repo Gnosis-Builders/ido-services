@@ -17,7 +17,6 @@ async fn test_with_ganache() {
     let accounts: Vec<Address> = web3.eth().accounts().await.expect("get accounts failed");
     let auctioneer = Account::Local(accounts[0], None);
     let trader_a = Account::Local(accounts[1], None);
-    let trader_b = Account::Local(accounts[2], None);
 
     let deploy_mintable_token = || async {
         ERC20Mintable::builder(&web3)
@@ -50,7 +49,7 @@ async fn test_with_ganache() {
     tx!(auctioneer, token_a.mint(auctioneer.address(), to_wei(100)));
 
     let token_b = deploy_mintable_token().await;
-    tx!(auctioneer, token_b.mint(trader_b.address(), to_wei(100)));
+    tx!(auctioneer, token_b.mint(trader_a.address(), to_wei(100)));
 
     // Initiate auction
     tx!(
@@ -79,13 +78,16 @@ async fn test_with_ganache() {
         &mut queue_start_as_hex,
     )
     .unwrap();
-    let amounts = (10 as u128).checked_pow(18).unwrap();
     tx!(
         trader_a,
         easy_auction.place_sell_orders(
             auction_id,
-            vec![amounts],
-            vec![amounts],
+            vec![(10 as u128).checked_pow(18).unwrap()],
+            vec![(10 as u128)
+                .checked_pow(18)
+                .unwrap()
+                .checked_mul(2)
+                .unwrap()],
             vec![queue_start_as_hex],
             vec![queue_start_as_hex],
         )
@@ -110,7 +112,7 @@ async fn test_with_ganache() {
 
     let orderbook_display = client
         .get(&format!(
-            "{}{}/{}",
+            "{}{}{}",
             API_HOST, ORDERBOOK_DISPLAY_ENDPOINT, auction_id
         ))
         .send()
