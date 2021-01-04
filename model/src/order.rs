@@ -191,18 +191,10 @@ mod tests {
             price: 10_f64 / 11_f64,
             volume: 100.0_f64,
         };
-        assert!(float_cmp::approx_eq!(
-            f64,
-            normal_order.to_price_point(*EIGHTEEN, *EIGHTEEN).price,
-            expected_price_point.price,
-            ulps = 2
-        ));
-        assert!(float_cmp::approx_eq!(
-            f64,
-            normal_order.to_price_point(*EIGHTEEN, *EIGHTEEN).volume,
-            expected_price_point.volume,
-            ulps = 2
-        ));
+        assert_eq!(
+            normal_order.to_price_point(*EIGHTEEN, *EIGHTEEN),
+            expected_price_point
+        );
     }
     #[test]
     fn to_price_point_without_18_digits() {
@@ -213,23 +205,11 @@ mod tests {
         };
         let expected_price_point = PricePoint {
             price: 10_f64 / (11_f64 * 10_f64.powi(12)),
-            volume: 100.0_f64 * 10_f64.powi(12),
+            volume: 100.0_f64,
         };
-        assert!(float_cmp::approx_eq!(
-            f64,
-            normal_order
-                .to_price_point(U256::from("6"), *EIGHTEEN)
-                .price,
-            expected_price_point.price,
-            ulps = 2
-        ));
-        assert!(float_cmp::approx_eq!(
-            f64,
-            normal_order
-                .to_price_point(*EIGHTEEN, U256::from("6"))
-                .volume,
-            expected_price_point.volume,
-            ulps = 2
-        ));
+        assert_eq!(
+            normal_order.to_price_point(U256::from("6"), *EIGHTEEN),
+            expected_price_point
+        );
     }
 }
