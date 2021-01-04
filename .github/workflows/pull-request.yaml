@@ -13,7 +13,7 @@ jobs:
       - uses: Swatinem/rust-cache@v1
       - run: |
           npm install ganache-cli
-          node_modules/.bin/ganache-cli -d -l 8e8
+          node_modules/.bin/ganache-cli -d -l 8e8&
       - run: |
           rustup --version
           rustup show
