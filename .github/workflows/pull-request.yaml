@@ -13,7 +13,7 @@ jobs:
       - uses: Swatinem/rust-cache@v1
       - run: |
           npm install ganache-cli
-          node_modules/.bin/ganache-cli --networkId 5777 --gasLimit 10000000 --gasPrice 0&
+          node_modules/.bin/ganache-cli -d -l 8e8
       - run: |
           rustup --version
           rustup show
