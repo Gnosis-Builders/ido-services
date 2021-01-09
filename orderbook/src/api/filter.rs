@@ -72,12 +72,12 @@ pub mod test_util {
         let order_1 = Order {
             sell_amount: U256::from_dec_str("2").unwrap(),
             buy_amount: U256::from_dec_str("2").unwrap(),
-            user_id: 10 as u64,
+            user_id: 10_u64,
         };
         let order_2 = Order {
             sell_amount: U256::from_dec_str("2").unwrap(),
             buy_amount: U256::from_dec_str("3").unwrap(),
-            user_id: 10 as u64,
+            user_id: 10_u64,
         };
         orderbook.insert_orders(auction_id, vec![order_1]).await;
         let filter = get_previous_order(Arc::new(orderbook));
@@ -98,16 +98,16 @@ pub mod test_util {
         let order_1 = Order {
             sell_amount: U256::from_dec_str("2").unwrap(),
             buy_amount: U256::from_dec_str("2").unwrap(),
-            user_id: 10 as u64,
+            user_id: 10_u64,
         };
         let order_2 = Order {
             sell_amount: U256::from_dec_str("2").unwrap(),
             buy_amount: U256::from_dec_str("2").unwrap(),
-            user_id: 9 as u64,
+            user_id: 9_u64,
         };
         let user = User {
             address: "740a98F8f4fAe0986FB3264Fe4aaCf94ac1EE96f".parse().unwrap(),
-            user_id: 10 as u64,
+            user_id: 10_u64,
         };
         orderbook
             .insert_orders(auction_id, vec![order_1, order_2])

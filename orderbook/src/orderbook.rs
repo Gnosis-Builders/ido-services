@@ -24,7 +24,7 @@ lazy_static! {
     pub static ref QUEUE_START: Order = Order {
         buy_amount: U256::from_dec_str("0").unwrap(),
         sell_amount: U256::from_dec_str("1").unwrap(),
-        user_id: 0 as u64,
+        user_id: 0_u64,
     };
 }
 impl Orderbook {
@@ -169,7 +169,7 @@ impl Orderbook {
     }
     pub async fn get_user_orders(&self, auction_id: u64, user: H160) -> Vec<Order> {
         let hashmap = self.users.read().await;
-        let user_id = *hashmap.get(&user).unwrap_or(&(0 as u64));
+        let user_id = *hashmap.get(&user).unwrap_or(&(0_u64));
         let hashmap = self.orders.read().await;
         let empty_vec = Vec::new();
         let current_orders = hashmap.get(&auction_id).unwrap_or(&empty_vec);
@@ -181,7 +181,7 @@ impl Orderbook {
     }
     pub async fn get_user_orders_without_claimed(&self, auction_id: u64, user: H160) -> Vec<Order> {
         let hashmap = self.users.read().await;
-        let user_id = *hashmap.get(&user).unwrap_or(&(0 as u64));
+        let user_id = *hashmap.get(&user).unwrap_or(&(0_u64));
         let hashmap = self.orders_without_claimed.read().await;
         let empty_vec = Vec::new();
         let current_orders = hashmap.get(&auction_id).unwrap_or(&empty_vec);
@@ -265,7 +265,7 @@ impl Orderbook {
             .auction_counter()
             .call()
             .await
-            .unwrap_or(U256::zero());
+            .unwrap_or_else(|_| U256::zero());
         for auction_id in 1..=(max_auction_id.low_u64()) {
             if let Err(err) = self
                 .initial_setup_if_not_yet_done(auction_id, event_reader)
@@ -284,7 +284,7 @@ impl Orderbook {
             let new_users: Vec<User>;
             let last_block_considered = *last_block_considered_per_auction_id
                 .get(&auction_id)
-                .unwrap_or(&(1 as u64));
+                .unwrap_or(&(1_u64));
             match event_reader
                 .get_order_updates(last_block_considered, auction_id, reorg_protection)
                 .await
@@ -327,7 +327,7 @@ mod tests {
         let order = Order {
             sell_amount: U256::from_dec_str("1230").unwrap(),
             buy_amount: U256::from_dec_str("123").unwrap(),
-            user_id: 10 as u64,
+            user_id: 10_u64,
         };
         let auction_id = 1;
         let mut orderbook = Orderbook::new();
@@ -340,7 +340,7 @@ mod tests {
         let order_1 = Order {
             sell_amount: U256::from_dec_str("1230").unwrap(),
             buy_amount: U256::from_dec_str("123").unwrap(),
-            user_id: 10 as u64,
+            user_id: 10_u64,
         };
         let auction_id = 1;
         let mut orderbook = Orderbook::new();
@@ -348,7 +348,7 @@ mod tests {
         let order_2 = Order {
             sell_amount: U256::from_dec_str("1230").unwrap(),
             buy_amount: U256::from_dec_str("12").unwrap(),
-            user_id: 10 as u64,
+            user_id: 10_u64,
         };
         orderbook.insert_orders(auction_id, vec![order_2]).await;
         orderbook.sort_orders(auction_id).await;
@@ -363,7 +363,7 @@ mod tests {
         let order_1 = Order {
             sell_amount: U256::from_dec_str("2").unwrap(),
             buy_amount: U256::from_dec_str("2").unwrap(),
-            user_id: 10 as u64,
+            user_id: 10_u64,
         };
         let auction_id = 1;
         let orderbook = Orderbook::new();
@@ -374,12 +374,12 @@ mod tests {
         let order_2 = Order {
             sell_amount: U256::from_dec_str("2").unwrap(),
             buy_amount: U256::from_dec_str("3").unwrap(),
-            user_id: 10 as u64,
+            user_id: 10_u64,
         };
         let order_3 = Order {
             sell_amount: U256::from_dec_str("2").unwrap(),
             buy_amount: U256::from_dec_str("3").unwrap(),
-            user_id: 9 as u64,
+            user_id: 9_u64,
         };
         orderbook
             .insert_orders(auction_id, vec![order_1, order_3])

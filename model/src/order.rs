@@ -154,7 +154,7 @@ mod tests {
         let order = Order {
             sell_amount: U256::from_dec_str("1230").unwrap(),
             buy_amount: U256::from_dec_str("123").unwrap(),
-            user_id: 10 as u64,
+            user_id: 10_u64,
         };
         let expected = "0x000000000000000a00000000000000000000007b0000000000000000000004ce";
         assert_eq!(order.to_string(), expected);
@@ -168,12 +168,12 @@ mod tests {
         let normal_order = Order {
             sell_amount: U256::from_dec_str("1230").unwrap(),
             buy_amount: U256::from_dec_str("123").unwrap(),
-            user_id: 10 as u64,
+            user_id: 10_u64,
         };
         let higher_priced_order = Order {
             sell_amount: U256::from_dec_str("1230").unwrap(),
             buy_amount: U256::from_dec_str("1000").unwrap(),
-            user_id: 10 as u64,
+            user_id: 10_u64,
         };
         assert_eq!(normal_order.cmp(&higher_priced_order), Ordering::Less);
         assert_eq!(normal_order.cmp(&normal_order), Ordering::Equal);
@@ -185,7 +185,7 @@ mod tests {
         let normal_order = Order {
             sell_amount: U256::from_dec_str("100000000000000000000").unwrap(),
             buy_amount: U256::from_dec_str("110000000000000000000").unwrap(),
-            user_id: 10 as u64,
+            user_id: 10_u64,
         };
         let expected_price_point = PricePoint {
             price: 10_f64 / 11_f64,
@@ -201,7 +201,7 @@ mod tests {
         let normal_order = Order {
             sell_amount: U256::from_dec_str("100000000000000000000").unwrap(),
             buy_amount: U256::from_dec_str("110000000000000000000").unwrap(),
-            user_id: 10 as u64,
+            user_id: 10_u64,
         };
         let expected_price_point = PricePoint {
             price: 10_f64 / (11_f64 * 10_f64.powi(12)),

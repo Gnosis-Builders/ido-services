@@ -65,8 +65,9 @@ async fn test_with_ganache() {
             token_b.address(),
             U256::from_str("3600").unwrap(),
             U256::from_str("3600").unwrap(),
-            (10 as u128).checked_pow(18).unwrap(),
-            (10 as u128).checked_pow(18).unwrap(),
+            (10_u128).checked_pow(18).unwrap(),
+            (10_u128).checked_pow(18).unwrap(),
+            U256::from_str("1").unwrap(),
             U256::from_str("1").unwrap()
         )
     );
@@ -85,13 +86,8 @@ async fn test_with_ganache() {
         trader_a,
         easy_auction.place_sell_orders(
             auction_id,
-            vec![(10 as u128).checked_pow(18).unwrap()],
-            vec![(10 as u128)
-                .checked_pow(18)
-                .unwrap()
-                .checked_mul(2)
-                .unwrap()],
-            vec![queue_start_as_hex],
+            vec![(10_u128).checked_pow(18).unwrap()],
+            vec![(10_u128).checked_pow(18).unwrap().checked_mul(2).unwrap()],
             vec![queue_start_as_hex],
         )
     );
@@ -125,8 +121,8 @@ async fn test_with_ganache() {
     let orderbook_value: Value =
         serde_json::from_str(&orderbook_display.text().await.unwrap()).unwrap();
     let expected_price_point = PricePoint {
-        price: 2.0 as f64,
-        volume: 2.0 as f64,
+        price: 2.0_f64,
+        volume: 2.0_f64,
     };
     let bids: Vec<PricePoint> = serde_json::from_value(orderbook_value["bids"].clone()).unwrap();
     assert_eq!(bids, vec![expected_price_point]);
