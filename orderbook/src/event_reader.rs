@@ -83,6 +83,23 @@ impl EventReader {
         }
         Ok(orders)
     }
+
+    pub async fn get_initial_auction_order(&self, auction_id: u64) -> Result<Order> {
+        let event = self
+            .contract
+            .events()
+            .new_auction()
+            .from_block(BlockNumber::Number(1_u64.into()))
+            .auction_id(U256::from(auction_id).into())
+            .query()
+            .await?;
+        let order = Order {
+            sell_amount: U256::from(event[0].data.auctioned_sell_amount),
+            buy_amount: U256::from(event[0].data.min_buy_amount),
+            user_id: 0_u64, // todo: set correctly
+        };
+        Ok(order)
+    }
     async fn get_order_claims_between_blocks(
         &self,
         from_block: u64,

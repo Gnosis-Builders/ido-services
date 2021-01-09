@@ -1,14 +1,12 @@
 use crate::event_reader::EventReader;
 use anyhow::Result;
 use ethcontract::Address;
-use hex::encode;
 use lazy_static::lazy_static;
 use model::order::{Order, OrderbookDisplay, PricePoint};
 use model::user::User;
 use primitive_types::H160;
 use primitive_types::U256;
 use std::collections::{hash_map::Entry, HashMap};
-use std::str::FromStr;
 use tokio::sync::RwLock;
 
 #[derive(Default, Debug)]
@@ -216,7 +214,7 @@ impl Orderbook {
                 .await?;
             let auctioning_token: Address = auction_data.0;
             let bidding_token: Address = auction_data.1;
-            let initial_order: Order = FromStr::from_str(&encode(&auction_data.4))?;
+            let initial_order: Order = event_reader.get_initial_auction_order(auction_id).await?;
             self.set_decimals_for_auctioning_token(auction_id, event_reader, auctioning_token)
                 .await?;
             self.set_decimals_for_bidding_token(auction_id, event_reader, bidding_token)
