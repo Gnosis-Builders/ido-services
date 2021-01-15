@@ -68,7 +68,8 @@ async fn test_with_ganache() {
             (10_u128).checked_pow(18).unwrap(),
             (10_u128).checked_pow(18).unwrap(),
             U256::from_str("1").unwrap(),
-            U256::from_str("1").unwrap()
+            U256::from_str("1").unwrap(),
+            false
         )
     );
     // Place Order
