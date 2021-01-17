@@ -40,13 +40,13 @@ pub fn get_user_orders(
         .and_then(handler::get_user_orders)
 }
 
-pub fn get_user_orders_without_claimed(
+pub fn get_user_orders_without_canceled_or_claimed(
     orderbook: Arc<Orderbook>,
 ) -> impl Filter<Extract = (impl warp::Reply,), Error = warp::Rejection> + Clone {
-    warp::path!("get_user_orders_without_claimed" / u64 / H160Wrapper)
+    warp::path!("get_user_orders_without_canceled_or_claimed" / u64 / H160Wrapper)
         .and(warp::get())
         .and(with_orderbook(orderbook))
-        .and_then(handler::get_user_orders_without_claimed)
+        .and_then(handler::get_user_orders_without_canceled_or_claimed)
 }
 
 pub fn get_order_book_display_data(
@@ -125,6 +125,52 @@ pub mod test_util {
         let response = request()
             .path(&format!(
                 "/get_user_orders/{:}/{:}",
+                auction_id,
+                user.show_full_address()
+            ))
+            .method("GET")
+            .reply(&filter)
+            .await;
+        assert_eq!(response.status(), StatusCode::OK);
+        let response_order: Vec<Order> = serde_json::from_slice(response.body()).unwrap();
+        assert_eq!(response_order, vec![order_1]);
+    }
+
+    #[tokio::test]
+    async fn get_user_orders_without_canceled_or_claimed_() {
+        let orderbook = Orderbook::default();
+        let auction_id: u64 = 1;
+        let order_1 = Order {
+            sell_amount: U256::from_dec_str("2").unwrap(),
+            buy_amount: U256::from_dec_str("2").unwrap(),
+            user_id: 10_u64,
+        };
+        let order_2 = Order {
+            sell_amount: U256::from_dec_str("2").unwrap(),
+            buy_amount: U256::from_dec_str("2").unwrap(),
+            user_id: 9_u64,
+        };
+        let user = User {
+            address: "740a98F8f4fAe0986FB3264Fe4aaCf94ac1EE96f".parse().unwrap(),
+            user_id: 10_u64,
+        };
+        orderbook
+            .insert_orders(auction_id, vec![order_1, order_2])
+            .await;
+        orderbook.insert_users(vec![user]).await;
+
+        let filter = get_user_orders_without_canceled_or_claimed(Arc::new(orderbook));
+        println!(
+            "{}",
+            format!(
+                "/get_user_orders_without_canceled_or_claimed/{:}/{:}",
+                auction_id,
+                user.show_full_address()
+            )
+        );
+        let response = request()
+            .path(&format!(
+                "/get_user_orders_without_canceled_or_claimed/{:}/{:}",
                 auction_id,
                 user.show_full_address()
             ))

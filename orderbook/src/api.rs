@@ -11,7 +11,8 @@ pub fn handle_all_routes(
     let get_previous_order = filter::get_previous_order(orderbook.clone());
     let get_order_book_display_data = filter::get_order_book_display_data(orderbook.clone());
     let get_user_orders = filter::get_user_orders(orderbook.clone());
-    let get_user_orders_without_claimed = filter::get_user_orders_without_claimed(orderbook);
+    let get_user_orders_without_claimed =
+        filter::get_user_orders_without_canceled_or_claimed(orderbook);
     warp::path!("api" / "v1" / ..).and(
         get_previous_order
             .or(get_order_book_display_data)

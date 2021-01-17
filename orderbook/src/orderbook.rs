@@ -177,7 +177,7 @@ impl Orderbook {
             .copied()
             .collect()
     }
-    pub async fn get_user_orders_without_claimed(&self, auction_id: u64, user: H160) -> Vec<Order> {
+    pub async fn get_user_orders_without_canceled_claimed(&self, auction_id: u64, user: H160) -> Vec<Order> {
         let hashmap = self.users.read().await;
         let user_id = *hashmap.get(&user).unwrap_or(&(0_u64));
         let hashmap = self.orders_without_claimed.read().await;

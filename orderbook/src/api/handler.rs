@@ -25,13 +25,13 @@ pub async fn get_user_orders(
     Ok(with_status(json(&order), StatusCode::OK))
 }
 
-pub async fn get_user_orders_without_claimed(
+pub async fn get_user_orders_without_canceled_or_claimed(
     auction_id: u64,
     user: H160Wrapper,
     orderbook: Arc<Orderbook>,
 ) -> Result<impl warp::Reply, Infallible> {
     let order = orderbook
-        .get_user_orders_without_claimed(auction_id, user.0)
+        .get_user_orders_without_canceled_claimed(auction_id, user.0)
         .await;
     Ok(with_status(json(&order), StatusCode::OK))
 }
