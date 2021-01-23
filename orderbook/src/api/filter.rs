@@ -39,6 +39,14 @@ pub fn get_user_orders(
         .and(with_orderbook(orderbook))
         .and_then(handler::get_user_orders)
 }
+pub fn get_clearing_order_and_volume(
+    orderbook: Arc<Orderbook>,
+) -> impl Filter<Extract = (impl warp::Reply,), Error = warp::Rejection> + Clone {
+    warp::path!("get_clearing_order_and_volume" / u64)
+        .and(warp::get())
+        .and(with_orderbook(orderbook))
+        .and_then(handler::get_clearing_order_and_volume)
+}
 
 pub fn get_user_orders_without_canceled_or_claimed(
     orderbook: Arc<Orderbook>,

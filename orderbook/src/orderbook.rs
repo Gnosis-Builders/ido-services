@@ -86,8 +86,8 @@ impl Orderbook {
     pub async fn sort_orders(&mut self, auction_id: u64) {
         let mut hashmap = self.orders.write().await;
         match hashmap.entry(auction_id) {
-            Entry::Occupied(mut order_vec) => {
-                order_vec.get_mut().sort();
+            Entry::Occupied(order_vec) => {
+                order_vec.into_mut().sort();
             }
             Entry::Vacant(_) => {}
         }
@@ -158,12 +158,10 @@ impl Orderbook {
         Ok(OrderbookDisplay { asks, bids })
     }
     #[allow(dead_code)]
-    pub async fn get_orders(&mut self, auction_id: u64) -> Vec<Order> {
-        let mut hashmap = self.orders.write().await;
-        match hashmap.entry(auction_id) {
-            Entry::Occupied(order_vec) => order_vec.get().clone(),
-            Entry::Vacant(_) => Vec::new(),
-        }
+    pub async fn get_orders(&self, auction_id: u64) -> Vec<Order> {
+        let hashmap = self.orders.read().await;
+        let empty_vec = Vec::new();
+        hashmap.get(&auction_id).unwrap_or(&empty_vec).clone()
     }
     pub async fn get_user_orders(&self, auction_id: u64, user: H160) -> Vec<Order> {
         let hashmap = self.users.read().await;
@@ -192,6 +190,83 @@ impl Orderbook {
             .filter(|order| order.user_id == user_id)
             .copied()
             .collect()
+    }
+    pub async fn get_clearing_order_and_volume(&self, auction_id: u64) -> (Order, U256) {
+        // code is one to one copy of smart contract, hence no extensive testing
+        let orders = self.get_orders(auction_id).await;
+        let initial_order = self.get_initial_order(auction_id).await;
+        let mut current_bid_sum = U256::zero();
+        let mut current_order = Order::default();
+
+        for order in orders {
+            current_order = order;
+            current_bid_sum = current_bid_sum.checked_add(order.sell_amount).unwrap();
+            if current_bid_sum
+                .checked_mul(order.buy_amount)
+                .unwrap()
+                .ge(&initial_order
+                    .sell_amount
+                    .checked_mul(order.sell_amount)
+                    .unwrap())
+            {
+                break;
+            }
+        }
+        if current_bid_sum.gt(&U256::zero())
+            && current_bid_sum
+                .checked_mul(current_order.buy_amount)
+                .unwrap()
+                .ge(&initial_order
+                    .sell_amount
+                    .checked_mul(current_order.sell_amount)
+                    .unwrap())
+        {
+            let uncovered_bids = current_bid_sum
+                .checked_sub(
+                    initial_order
+                        .sell_amount
+                        .checked_mul(current_order.sell_amount)
+                        .unwrap()
+                        .checked_div(current_order.buy_amount)
+                        .unwrap(),
+                )
+                .unwrap();
+            if current_order.sell_amount.ge(&uncovered_bids) {
+                let sell_amount_clearing_order = current_order
+                    .sell_amount
+                    .checked_sub(uncovered_bids)
+                    .unwrap();
+                (current_order, sell_amount_clearing_order)
+            } else {
+                let clearing_order = Order {
+                    sell_amount: current_bid_sum,
+                    buy_amount: initial_order.sell_amount,
+                    user_id: 0_u64,
+                };
+                (clearing_order, U256::zero())
+            }
+        } else {
+            if current_bid_sum.gt(&initial_order.buy_amount) {
+                let clearing_order = Order {
+                    buy_amount: initial_order.sell_amount,
+                    sell_amount: current_bid_sum,
+                    user_id: 0_u64,
+                };
+                (clearing_order, U256::zero())
+            } else {
+                let clearing_order = Order {
+                    buy_amount: initial_order.sell_amount,
+                    sell_amount: initial_order.buy_amount,
+                    user_id: 0_u64,
+                };
+                let clearing_volume = current_bid_sum
+                    .checked_mul(initial_order.sell_amount)
+                    .unwrap()
+                    .checked_div(initial_order.buy_amount)
+                    .unwrap();
+                (clearing_order, clearing_volume)
+            }
+        }
     }
     pub async fn get_previous_order(&self, auction_id: u64, order: Order) -> Order {
         let order_hashmap = self.orders_without_claimed.read().await;
@@ -332,7 +407,7 @@ mod tests {
             user_id: 10_u64,
         };
         let auction_id = 1;
-        let mut orderbook = Orderbook::new();
+        let orderbook = Orderbook::new();
         orderbook.insert_orders(auction_id, vec![order]).await;
         assert_eq!(orderbook.get_orders(auction_id).await, vec![order]);
     }
@@ -359,7 +434,42 @@ mod tests {
             vec![order_2, order_1]
         );
     }
+    #[tokio::test]
+    async fn get_clearing_order_and_price_() {
+        let order_1 = Order {
+            sell_amount: U256::from_dec_str("2").unwrap(),
+            buy_amount: U256::from_dec_str("2").unwrap(),
+            user_id: 1_u64,
+        };
+        let order_2 = Order {
+            sell_amount: U256::from_dec_str("2").unwrap(),
+            buy_amount: U256::from_dec_str("1").unwrap(),
+            user_id: 2_u64,
+        };
+        let order_3 = Order {
+            sell_amount: U256::from_dec_str("2").unwrap(),
+            buy_amount: U256::from_dec_str("3").unwrap(),
+            user_id: 3_u64,
+        };
+        let initial_order = Order {
+            sell_amount: U256::from_dec_str("4").unwrap(),
+            buy_amount: U256::from_dec_str("2").unwrap(),
+            user_id: 10_u64,
+        };
+        let auction_id = 1;
+        let mut orderbook = Orderbook::new();
+        orderbook
+            .insert_orders(auction_id, vec![order_1, order_2, order_3])
+            .await;
+        orderbook
+            .update_initial_order(auction_id, initial_order)
+            .await;
+        orderbook.sort_orders(auction_id).await;
+        let result = orderbook.get_clearing_order_and_volume(auction_id).await;
 
+        assert_eq!(result.0, order_1);
+        assert_eq!(result.1, order_1.sell_amount);
+    }
     #[tokio::test]
     async fn get_previous_order() {
         let order_1 = Order {
