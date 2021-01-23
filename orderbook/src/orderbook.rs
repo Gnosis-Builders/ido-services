@@ -245,27 +245,25 @@ impl Orderbook {
                 };
                 (clearing_order, U256::zero())
             }
+        } else if current_bid_sum.gt(&initial_order.buy_amount) {
+            let clearing_order = Order {
+                buy_amount: initial_order.sell_amount,
+                sell_amount: current_bid_sum,
+                user_id: 0_u64,
+            };
+            (clearing_order, U256::zero())
         } else {
-            if current_bid_sum.gt(&initial_order.buy_amount) {
-                let clearing_order = Order {
-                    buy_amount: initial_order.sell_amount,
-                    sell_amount: current_bid_sum,
-                    user_id: 0_u64,
-                };
-                (clearing_order, U256::zero())
-            } else {
-                let clearing_order = Order {
-                    buy_amount: initial_order.sell_amount,
-                    sell_amount: initial_order.buy_amount,
-                    user_id: 0_u64,
-                };
-                let clearing_volume = current_bid_sum
-                    .checked_mul(initial_order.sell_amount)
-                    .unwrap()
-                    .checked_div(initial_order.buy_amount)
-                    .unwrap();
-                (clearing_order, clearing_volume)
-            }
+            let clearing_order = Order {
+                buy_amount: initial_order.sell_amount,
+                sell_amount: initial_order.buy_amount,
+                user_id: 0_u64,
+            };
+            let clearing_volume = current_bid_sum
+                .checked_mul(initial_order.sell_amount)
+                .unwrap()
+                .checked_div(initial_order.buy_amount)
+                .unwrap();
+            (clearing_order, clearing_volume)
         }
     }
     pub async fn get_previous_order(&self, auction_id: u64, order: Order) -> Order {
