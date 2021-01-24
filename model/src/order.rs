@@ -25,6 +25,14 @@ pub struct PricePoint {
     pub price: f64,
     pub volume: f64,
 }
+impl PricePoint {
+    pub fn invert_price(&self) -> Self {
+        PricePoint {
+            price: 1_f64 / self.price,
+            volume: self.volume,
+        }
+    }
+}
 lazy_static! {
     pub static ref TEN: U256 = U256::from_dec_str("10").unwrap();
     pub static ref EIGHTEEN: U256 = U256::from_dec_str("18").unwrap();

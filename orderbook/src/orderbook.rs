@@ -148,12 +148,16 @@ impl Orderbook {
         let asks: Vec<PricePoint> = initial_order
             .iter()
             .map(|order| Order {
-                // << invert price for unified representation of different orders.
-                sell_amount: order.buy_amount,
-                buy_amount: order.sell_amount,
+                sell_amount: order.sell_amount,
+                buy_amount: order.buy_amount,
                 user_id: order.user_id,
             })
-            .map(|order| order.to_price_point(*decimals_auctioning_token, *decimals_bidding_token))
+            .map(|order| {
+                order
+                    .to_price_point(*decimals_auctioning_token, *decimals_bidding_token)
+                    // << invert price for unified representation of different orders.
+                    .invert_price()
+            })
             .collect();
         Ok(OrderbookDisplay { asks, bids })
     }
