@@ -83,7 +83,7 @@ impl Orderbook {
         let order_hashmap = self.initial_order.read().await;
         order_hashmap.contains_key(&auction_id)
     }
-    pub async fn sort_orders(&mut self, auction_id: u64) {
+    pub async fn sort_orders(&self, auction_id: u64) {
         let mut hashmap = self.orders.write().await;
         match hashmap.entry(auction_id) {
             Entry::Occupied(order_vec) => {
@@ -390,6 +390,7 @@ impl Orderbook {
             self.remove_orders(auction_id, canceled_orders).await;
             self.remove_claimed_orders(auction_id, new_claimed_orders)
                 .await;
+            self.sort_orders(auction_id).await;
         }
         Ok(())
     }
@@ -422,7 +423,7 @@ mod tests {
             user_id: 10_u64,
         };
         let auction_id = 1;
-        let mut orderbook = Orderbook::new();
+        let orderbook = Orderbook::new();
         orderbook.insert_orders(auction_id, vec![order_1]).await;
         let order_2 = Order {
             sell_amount: U256::from_dec_str("1230").unwrap(),
@@ -471,6 +472,46 @@ mod tests {
 
         assert_eq!(result.0, order_1);
         assert_eq!(result.1, order_1.sell_amount);
+    }
+    #[tokio::test]
+    async fn get_clearing_order_and_price_2() {
+        let order_1 = Order {
+            sell_amount: U256::from_dec_str("500000000000000000000").unwrap(),
+            buy_amount: U256::from_dec_str("364697301239970824").unwrap(),
+            user_id: 1_u64,
+        };
+        let order_2 = Order {
+            sell_amount: U256::from_dec_str("500000000000000000000").unwrap(),
+            buy_amount: U256::from_dec_str("334697301239970824").unwrap(),
+            user_id: 2_u64,
+        };
+        let order_3 = Order {
+            sell_amount: U256::from_dec_str("10000000000000000000").unwrap(),
+            buy_amount: U256::from_dec_str("30697301239970824").unwrap(),
+            user_id: 3_u64,
+        };
+        let order_4 = Order {
+            sell_amount: U256::from_dec_str("500000000000000000000").unwrap(),
+            buy_amount: U256::from_dec_str("374697301239970824").unwrap(),
+            user_id: 3_u64,
+        };
+        let initial_order = Order {
+            sell_amount: U256::from_dec_str("1000000000000000000").unwrap(),
+            buy_amount: U256::from_dec_str("1300000000000000000000").unwrap(),
+            user_id: 10_u64,
+        };
+        let auction_id = 1;
+        let mut orderbook = Orderbook::new();
+        orderbook
+            .insert_orders(auction_id, vec![order_1, order_2, order_3, order_4])
+            .await;
+        orderbook
+            .update_initial_order(auction_id, initial_order)
+            .await;
+        orderbook.sort_orders(auction_id).await;
+        let result = orderbook.get_clearing_order_and_volume(auction_id).await;
+
+        assert_eq!(result.0, order_4);
     }
     #[tokio::test]
     async fn get_previous_order() {
