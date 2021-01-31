@@ -13,12 +13,15 @@ pub fn handle_all_routes(
     let get_user_orders = filter::get_user_orders(orderbook.clone());
     let get_user_orders_without_claimed =
         filter::get_user_orders_without_canceled_or_claimed(orderbook.clone());
-    let get_clearing_order_and_volume = filter::get_clearing_order_and_volume(orderbook);
+    let get_clearing_order_and_volume = filter::get_clearing_order_and_volume(orderbook.clone());
+    let get_details_of_most_interesting_auctions =
+        filter::get_details_of_most_interesting_auctions(orderbook);
     warp::path!("api" / "v1" / ..).and(
         get_previous_order
             .or(get_order_book_display_data)
             .or(get_user_orders)
             .or(get_user_orders_without_claimed)
-            .or(get_clearing_order_and_volume),
+            .or(get_clearing_order_and_volume)
+            .or(get_details_of_most_interesting_auctions),
     )
 }

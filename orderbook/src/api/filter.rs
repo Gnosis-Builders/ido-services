@@ -66,6 +66,15 @@ pub fn get_order_book_display_data(
         .and_then(handler::get_order_book_display_data)
 }
 
+pub fn get_details_of_most_interesting_auctions(
+    orderbook: Arc<Orderbook>,
+) -> impl Filter<Extract = (impl warp::Reply,), Error = warp::Rejection> + Clone {
+    warp::path!("get_details_of_most_interesting_auctions" / u64)
+        .and(warp::get())
+        .and(with_orderbook(orderbook))
+        .and_then(handler::get_details_of_most_interesting_auctions)
+}
+
 #[cfg(test)]
 pub mod test_util {
     use super::*;
