@@ -73,3 +73,16 @@ pub async fn get_details_of_most_interesting_auctions(
         Ok(auction_detail_data) => Ok(with_status(json(&auction_detail_data), StatusCode::OK)),
     }
 }
+
+pub async fn get_all_auction_with_details(
+    orderbook: Arc<Orderbook>,
+) -> Result<impl warp::Reply, Infallible> {
+    let auction_detail_data = orderbook.get_all_auction_with_details().await;
+    match auction_detail_data {
+        Err(err) => Ok(with_status(
+            json(&format!("{:}", err)),
+            StatusCode::BAD_REQUEST,
+        )),
+        Ok(auction_detail_data) => Ok(with_status(json(&auction_detail_data), StatusCode::OK)),
+    }
+}

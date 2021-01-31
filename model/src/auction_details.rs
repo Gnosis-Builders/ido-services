@@ -7,6 +7,7 @@ use std::cmp::PartialOrd;
 
 #[derive(Clone, Debug, Default, Serialize)]
 pub struct AuctionDetails {
+    pub auction_id: u64,
     pub order: PricePoint,
     pub symbol_auctioning_token: String,
     pub symbol_bidding_token: String,

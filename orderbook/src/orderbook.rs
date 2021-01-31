@@ -335,6 +335,7 @@ impl Orderbook {
             .to_price_point(decimals_bidding_token, decimals_auctioning_token)
             .invert_price();
         let details = AuctionDetails {
+            auction_id,
             order: price_point,
             symbol_auctioning_token,
             symbol_bidding_token,
@@ -430,6 +431,16 @@ impl Orderbook {
             non_closed_auctions = non_closed_auctions[0..(number_of_auctions as usize)].to_vec()
         }
         Ok(non_closed_auctions)
+    }
+    pub async fn get_all_auction_with_details(&self) -> Result<Vec<AuctionDetails>> {
+        let auction_details_hashmap = self.auction_details.read().await;
+        let mut auction_detail_list: Vec<AuctionDetails> = Vec::new();
+        for auction_id in auction_details_hashmap.keys() {
+            let auction_details = auction_details_hashmap.get(&auction_id).unwrap();
+
+            auction_detail_list.push(auction_details.clone());
+        }
+        Ok(auction_detail_list)
     }
 }
 
