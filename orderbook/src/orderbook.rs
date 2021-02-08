@@ -344,6 +344,7 @@ impl Orderbook {
             decimals_auctioning_token,
             decimals_bidding_token,
             end_time_timestamp,
+            current_clearing_price: price_point.price,
         };
         auction_details.insert(auction_id, details);
         Ok(())
@@ -406,7 +407,35 @@ impl Orderbook {
             self.remove_claimed_orders(auction_id, new_claimed_orders)
                 .await;
             self.sort_orders(auction_id).await;
+            println!("done until the  usual");
+            self.update_clearing_price_info(auction_id).await?;
         }
+        Ok(())
+    }
+    pub async fn update_clearing_price_info(&self, auction_id: u64) -> Result<()> {
+        let new_clearing_price = self.get_clearing_order_and_volume(auction_id).await;
+        let decimals_auctioning_token;
+        let decimals_bidding_token;
+        {
+            let reading_guard = self.auction_details.read().await;
+            decimals_auctioning_token = reading_guard
+                .get(&auction_id)
+                .expect("auction not yet initialized in backend")
+                .decimals_auctioning_token;
+
+            decimals_bidding_token = reading_guard
+                .get(&auction_id)
+                .expect("auction not yet initialized in backend")
+                .decimals_bidding_token;
+        }
+        self.update_current_price_of_details(
+            auction_id,
+            new_clearing_price
+                .0
+                .to_price_point(decimals_auctioning_token, decimals_bidding_token)
+                .price,
+        )
+        .await?;
         Ok(())
     }
     pub async fn get_most_interesting_auctions(
@@ -441,6 +470,16 @@ impl Orderbook {
             auction_detail_list.push(auction_details.clone());
         }
         Ok(auction_detail_list)
+    }
+    pub async fn update_current_price_of_details(&self, auction_id: u64, price: f64) -> Result<()> {
+        let mut auction_details_hashmap = self.auction_details.write().await;
+        match auction_details_hashmap.entry(auction_id) {
+            Entry::Occupied(mut details) => {
+                details.get_mut().current_clearing_price = price;
+            }
+            Entry::Vacant(_) => {}
+        }
+        Ok(())
     }
 }
 
