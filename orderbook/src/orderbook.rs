@@ -407,7 +407,6 @@ impl Orderbook {
             self.remove_claimed_orders(auction_id, new_claimed_orders)
                 .await;
             self.sort_orders(auction_id).await;
-            println!("done until the  usual");
             self.update_clearing_price_info(auction_id).await?;
         }
         Ok(())
