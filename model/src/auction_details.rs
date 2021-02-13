@@ -17,6 +17,7 @@ pub struct AuctionDetails {
     pub decimals_auctioning_token: U256,
     pub decimals_bidding_token: U256,
     pub end_time_timestamp: u64,
+    pub starting_timestamp: u64,
     pub current_clearing_price: f64,
 }
 

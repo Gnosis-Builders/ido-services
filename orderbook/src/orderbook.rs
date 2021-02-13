@@ -297,18 +297,19 @@ impl Orderbook {
                 .await?;
             let auctioning_token: Address = auction_data.0;
             let bidding_token: Address = auction_data.1;
-            let initial_order: Order = event_reader.get_initial_auction_order(auction_id).await?;
+            let event_data = event_reader.get_auction_info_from_event(auction_id).await?;
             self.set_auction_details(
                 auction_id,
-                initial_order,
+                event_data.order,
                 event_reader,
                 auctioning_token,
                 bidding_token,
                 auction_data.3.as_u64(),
+                event_data.timestamp,
             )
             .await?;
             let mut order_hashmap = self.initial_order.write().await;
-            order_hashmap.insert(auction_id, initial_order);
+            order_hashmap.insert(auction_id, event_data.order);
         }
         Ok(())
     }
@@ -320,6 +321,7 @@ impl Orderbook {
         address_auctioning_token: Address,
         address_bidding_token: Address,
         end_time_timestamp: u64,
+        starting_timestamp: u64,
     ) -> Result<()> {
         let bidding_erc20_contract =
             contracts::ERC20::at(&event_reader.web3, address_bidding_token);
@@ -344,6 +346,7 @@ impl Orderbook {
             decimals_auctioning_token,
             decimals_bidding_token,
             end_time_timestamp,
+            starting_timestamp,
             current_clearing_price: price_point.price,
         };
         auction_details.insert(auction_id, details);
