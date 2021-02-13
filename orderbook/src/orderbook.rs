@@ -11,6 +11,13 @@ use std::collections::{hash_map::Entry, HashMap};
 use std::time::SystemTime;
 use tokio::sync::RwLock;
 
+pub struct AuctionInfos {
+    initial_order: Order,
+    address_auctioning_token: Address,
+    address_bidding_token: Address,
+    end_time_timestamp: u64,
+    starting_timestamp: u64,
+}
 #[derive(Default, Debug)]
 pub struct Orderbook {
     pub orders: RwLock<HashMap<u64, Vec<Order>>>,
@@ -295,17 +302,19 @@ impl Orderbook {
                 .auction_data(U256::from(auction_id))
                 .call()
                 .await?;
-            let auctioning_token: Address = auction_data.0;
-            let bidding_token: Address = auction_data.1;
+            let address_auctioning_token: Address = auction_data.0;
+            let address_bidding_token: Address = auction_data.1;
             let event_data = event_reader.get_auction_info_from_event(auction_id).await?;
             self.set_auction_details(
                 auction_id,
-                event_data.order,
                 event_reader,
-                auctioning_token,
-                bidding_token,
-                auction_data.3.as_u64(),
-                event_data.timestamp,
+                AuctionInfos {
+                    initial_order: event_data.order,
+                    address_auctioning_token,
+                    address_bidding_token,
+                    end_time_timestamp: auction_data.3.as_u64(),
+                    starting_timestamp: event_data.timestamp,
+                },
             )
             .await?;
             let mut order_hashmap = self.initial_order.write().await;
@@ -316,24 +325,21 @@ impl Orderbook {
     pub async fn set_auction_details(
         &self,
         auction_id: u64,
-        initial_order: Order,
         event_reader: &EventReader,
-        address_auctioning_token: Address,
-        address_bidding_token: Address,
-        end_time_timestamp: u64,
-        starting_timestamp: u64,
+        auction_infos: AuctionInfos,
     ) -> Result<()> {
         let bidding_erc20_contract =
-            contracts::ERC20::at(&event_reader.web3, address_bidding_token);
+            contracts::ERC20::at(&event_reader.web3, auction_infos.address_bidding_token);
         let auctioning_erc20_contract =
-            contracts::ERC20::at(&event_reader.web3, address_auctioning_token);
+            contracts::ERC20::at(&event_reader.web3, auction_infos.address_auctioning_token);
         let symbol_auctioning_token = auctioning_erc20_contract.symbol().call().await?;
         let decimals_auctioning_token =
             U256::from(auctioning_erc20_contract.decimals().call().await?);
         let symbol_bidding_token = bidding_erc20_contract.symbol().call().await?;
         let decimals_bidding_token = U256::from(auctioning_erc20_contract.decimals().call().await?);
         let mut auction_details = self.auction_details.write().await;
-        let price_point = initial_order
+        let price_point = auction_infos
+            .initial_order
             .to_price_point(decimals_bidding_token, decimals_auctioning_token)
             .invert_price();
         let details = AuctionDetails {
@@ -341,12 +347,12 @@ impl Orderbook {
             order: price_point,
             symbol_auctioning_token,
             symbol_bidding_token,
-            address_bidding_token,
-            address_auctioning_token,
+            address_bidding_token: auction_infos.address_bidding_token,
+            address_auctioning_token: auction_infos.address_auctioning_token,
             decimals_auctioning_token,
             decimals_bidding_token,
-            end_time_timestamp,
-            starting_timestamp,
+            end_time_timestamp: auction_infos.end_time_timestamp,
+            starting_timestamp: auction_infos.starting_timestamp,
             current_clearing_price: price_point.price,
         };
         auction_details.insert(auction_id, details);

@@ -102,7 +102,7 @@ impl EventReader {
         if let Some(event_meta_data) = event[0].meta.clone() {
             let block_id = web3::types::BlockId::from(event_meta_data.block_hash);
             let block_info = self.web3.eth().block(block_id).await.unwrap();
-            if let Some(block_data) = block_info.clone() {
+            if let Some(block_data) = block_info {
                 event_timestamp = Some(block_data.timestamp.as_u64());
             } else {
                 tracing::error!("Unable to retrieve auction starting point");
