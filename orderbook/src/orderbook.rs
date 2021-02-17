@@ -7,23 +7,17 @@ use model::order::{Order, OrderbookDisplay, PricePoint};
 use model::user::User;
 use primitive_types::H160;
 use primitive_types::U256;
-use std::collections::{hash_map::Entry, HashMap};
+use std::collections::{hash_map::Entry, HashMap, HashSet};
 use std::time::SystemTime;
 use tokio::sync::RwLock;
 
-pub struct AuctionInfos {
-    initial_order: Order,
-    address_auctioning_token: Address,
-    address_bidding_token: Address,
-    end_time_timestamp: u64,
-    starting_timestamp: u64,
-}
 #[derive(Default, Debug)]
 pub struct Orderbook {
     pub orders: RwLock<HashMap<u64, Vec<Order>>>,
     pub orders_without_claimed: RwLock<HashMap<u64, Vec<Order>>>,
     pub initial_order: RwLock<HashMap<u64, Order>>,
     pub users: RwLock<HashMap<Address, u64>>,
+    pub auction_participation: RwLock<HashMap<u64, HashSet<u64>>>,
     pub auction_details: RwLock<HashMap<u64, AuctionDetails>>,
 }
 lazy_static! {
@@ -41,6 +35,7 @@ impl Orderbook {
             orders_without_claimed: RwLock::new(HashMap::new()),
             initial_order: RwLock::new(HashMap::new()),
             users: RwLock::new(HashMap::new()),
+            auction_participation: RwLock::new(HashMap::new()),
             auction_details: RwLock::new(HashMap::new()),
         }
     }
@@ -60,10 +55,31 @@ impl Orderbook {
             let mut hashmap = self.orders_without_claimed.write().await;
             match hashmap.entry(auction_id) {
                 Entry::Occupied(mut order_vec) => {
-                    order_vec.get_mut().extend(orders);
+                    order_vec.get_mut().extend(orders.clone());
                 }
                 Entry::Vacant(_) => {
-                    hashmap.insert(auction_id, orders);
+                    hashmap.insert(auction_id, orders.clone());
+                }
+            }
+        }
+        {
+            let vec_users: HashSet<u64> = orders
+                .into_iter()
+                .map(|order| order.user_id)
+                .collect::<HashSet<u64>>()
+                .into_iter()
+                .collect();
+            for user_id in vec_users {
+                let mut hashmap = self.auction_participation.write().await;
+                match hashmap.entry(user_id) {
+                    Entry::Occupied(mut auction_set) => {
+                        auction_set.get_mut().insert(auction_id);
+                    }
+                    Entry::Vacant(_) => {
+                        let mut new_hash_set = HashSet::new();
+                        new_hash_set.insert(auction_id);
+                        hashmap.insert(user_id, new_hash_set.clone());
+                    }
                 }
             }
         }
@@ -176,6 +192,18 @@ impl Orderbook {
         let empty_vec = Vec::new();
         hashmap.get(&auction_id).unwrap_or(&empty_vec).clone()
     }
+    pub async fn get_used_auctions(&self, user_id: u64) -> HashSet<u64> {
+        let hashmap = self.auction_participation.read().await;
+        let empty_set = HashSet::new();
+        let result = hashmap.get(&user_id).unwrap_or(&empty_set).clone();
+        println!("{:?}", result);
+        result
+    }
+    pub async fn get_user_id(&self, user: H160) -> Result<u64> {
+        let hashmap = self.users.read().await;
+        Ok(*hashmap.get(&user).unwrap_or(&(0_u64)))
+    }
+
     pub async fn get_user_orders(&self, auction_id: u64, user: H160) -> Vec<Order> {
         let hashmap = self.users.read().await;
         let user_id = *hashmap.get(&user).unwrap_or(&(0_u64));
@@ -305,18 +333,34 @@ impl Orderbook {
             let address_auctioning_token: Address = auction_data.0;
             let address_bidding_token: Address = auction_data.1;
             let event_data = event_reader.get_auction_info_from_event(auction_id).await?;
-            self.set_auction_details(
+            let bidding_erc20_contract =
+                contracts::ERC20::at(&event_reader.web3, address_bidding_token);
+            let auctioning_erc20_contract =
+                contracts::ERC20::at(&event_reader.web3, address_auctioning_token);
+            let symbol_auctioning_token = auctioning_erc20_contract.symbol().call().await?;
+            let decimals_auctioning_token =
+                U256::from(auctioning_erc20_contract.decimals().call().await?);
+            let symbol_bidding_token = bidding_erc20_contract.symbol().call().await?;
+            let decimals_bidding_token =
+                U256::from(auctioning_erc20_contract.decimals().call().await?);
+            let price_point = event_data
+                .order
+                .to_price_point(decimals_bidding_token, decimals_auctioning_token)
+                .invert_price();
+            let details = AuctionDetails {
                 auction_id,
-                event_reader,
-                AuctionInfos {
-                    initial_order: event_data.order,
-                    address_auctioning_token,
-                    address_bidding_token,
-                    end_time_timestamp: auction_data.3.as_u64(),
-                    starting_timestamp: event_data.timestamp,
-                },
-            )
-            .await?;
+                order: price_point,
+                symbol_auctioning_token,
+                symbol_bidding_token,
+                address_bidding_token,
+                address_auctioning_token,
+                decimals_auctioning_token,
+                decimals_bidding_token,
+                end_time_timestamp: auction_data.3.as_u64(),
+                starting_timestamp: event_data.timestamp,
+                current_clearing_price: price_point.price,
+            };
+            self.set_auction_details(auction_id, details).await?;
             let mut order_hashmap = self.initial_order.write().await;
             order_hashmap.insert(auction_id, event_data.order);
         }
@@ -325,36 +369,9 @@ impl Orderbook {
     pub async fn set_auction_details(
         &self,
         auction_id: u64,
-        event_reader: &EventReader,
-        auction_infos: AuctionInfos,
+        details: AuctionDetails,
     ) -> Result<()> {
-        let bidding_erc20_contract =
-            contracts::ERC20::at(&event_reader.web3, auction_infos.address_bidding_token);
-        let auctioning_erc20_contract =
-            contracts::ERC20::at(&event_reader.web3, auction_infos.address_auctioning_token);
-        let symbol_auctioning_token = auctioning_erc20_contract.symbol().call().await?;
-        let decimals_auctioning_token =
-            U256::from(auctioning_erc20_contract.decimals().call().await?);
-        let symbol_bidding_token = bidding_erc20_contract.symbol().call().await?;
-        let decimals_bidding_token = U256::from(auctioning_erc20_contract.decimals().call().await?);
         let mut auction_details = self.auction_details.write().await;
-        let price_point = auction_infos
-            .initial_order
-            .to_price_point(decimals_bidding_token, decimals_auctioning_token)
-            .invert_price();
-        let details = AuctionDetails {
-            auction_id,
-            order: price_point,
-            symbol_auctioning_token,
-            symbol_bidding_token,
-            address_bidding_token: auction_infos.address_bidding_token,
-            address_auctioning_token: auction_infos.address_auctioning_token,
-            decimals_auctioning_token,
-            decimals_bidding_token,
-            end_time_timestamp: auction_infos.end_time_timestamp,
-            starting_timestamp: auction_infos.starting_timestamp,
-            current_clearing_price: price_point.price,
-        };
         auction_details.insert(auction_id, details);
         Ok(())
     }
@@ -499,15 +516,22 @@ mod tests {
 
     #[tokio::test]
     async fn adds_order_to_orderbook() {
+        let user_id = 10_u64;
         let order = Order {
             sell_amount: U256::from_dec_str("1230").unwrap(),
             buy_amount: U256::from_dec_str("123").unwrap(),
-            user_id: 10_u64,
+            user_id,
         };
         let auction_id = 1;
         let orderbook = Orderbook::new();
         orderbook.insert_orders(auction_id, vec![order]).await;
         assert_eq!(orderbook.get_orders(auction_id).await, vec![order]);
+        let mut expected_hash_set = HashSet::new();
+        expected_hash_set.insert(auction_id);
+        assert_eq!(
+            orderbook.get_used_auctions(user_id).await,
+            expected_hash_set
+        );
     }
 
     #[tokio::test]

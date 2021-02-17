@@ -1,11 +1,11 @@
 use super::order::PricePoint;
 use ethcontract::Address;
 use primitive_types::U256;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 use std::cmp::PartialOrd;
 
-#[derive(Clone, Debug, Default, Serialize)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AuctionDetails {
     pub auction_id: u64,
