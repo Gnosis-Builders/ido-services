@@ -83,9 +83,20 @@ pub fn get_all_auction_with_details(
         .and_then(handler::get_all_auction_with_details)
 }
 
+pub fn get_all_auction_with_details_with_user_participation(
+    orderbook: Arc<Orderbook>,
+) -> impl Filter<Extract = (impl warp::Reply,), Error = warp::Rejection> + Clone {
+    warp::path!("get_all_auction_with_details_with_user_participation" / H160Wrapper)
+        .and(warp::get())
+        .and(with_orderbook(orderbook))
+        .and_then(handler::get_all_auction_with_details_with_user_participation)
+}
+
 #[cfg(test)]
 pub mod test_util {
     use super::*;
+    use crate::api::handler::AuctionDetailsForUser;
+    use model::auction_details::AuctionDetails;
     use model::user::User;
     use primitive_types::U256;
     use warp::{http::StatusCode, test::request};
@@ -205,5 +216,49 @@ pub mod test_util {
         assert_eq!(response.status(), StatusCode::OK);
         let response_order: Vec<Order> = serde_json::from_slice(response.body()).unwrap();
         assert_eq!(response_order, vec![order_1]);
+    }
+    #[tokio::test]
+    async fn get_auction_details_for_user_() {
+        let orderbook = Orderbook::default();
+        let auction_id: u64 = 1;
+        let order_1 = Order {
+            sell_amount: U256::from_dec_str("2").unwrap(),
+            buy_amount: U256::from_dec_str("2").unwrap(),
+            user_id: 10_u64,
+        };
+        let order_2 = Order {
+            sell_amount: U256::from_dec_str("2").unwrap(),
+            buy_amount: U256::from_dec_str("2").unwrap(),
+            user_id: 9_u64,
+        };
+        let user = User {
+            address: "740a98F8f4fAe0986FB3264Fe4aaCf94ac1EE96f".parse().unwrap(),
+            user_id: 10_u64,
+        };
+        orderbook
+            .insert_orders(auction_id, vec![order_1, order_2])
+            .await;
+        orderbook.insert_users(vec![user]).await;
+        let auction_details = AuctionDetails {
+            auction_id,
+            ..Default::default()
+        };
+        orderbook
+            .set_auction_details(auction_id, auction_details)
+            .await
+            .unwrap();
+        let filter = get_all_auction_with_details_with_user_participation(Arc::new(orderbook));
+        let response = request()
+            .path(&format!(
+                "/get_all_auction_with_details_with_user_participation/{:}",
+                user.show_full_address()
+            ))
+            .method("GET")
+            .reply(&filter)
+            .await;
+        assert_eq!(response.status(), StatusCode::OK);
+        let response_details: Vec<AuctionDetailsForUser> =
+            serde_json::from_slice(response.body()).unwrap();
+        assert_eq!(response_details.get(0).unwrap().has_participation, true);
     }
 }

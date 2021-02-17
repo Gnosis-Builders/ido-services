@@ -20,6 +20,11 @@ pub struct OrderUpdates {
     pub last_block_handled: u64,
 }
 
+pub struct DataFromEvent {
+    pub order: Order,
+    pub timestamp: u64,
+}
+
 const BLOCK_CONFIRMATION_COUNT: u64 = 10;
 
 impl EventReader {
@@ -84,7 +89,7 @@ impl EventReader {
         Ok(orders)
     }
 
-    pub async fn get_initial_auction_order(&self, auction_id: u64) -> Result<Order> {
+    pub async fn get_auction_info_from_event(&self, auction_id: u64) -> Result<DataFromEvent> {
         let event = self
             .contract
             .events()
@@ -93,12 +98,27 @@ impl EventReader {
             .auction_id(U256::from(auction_id).into())
             .query()
             .await?;
+        let mut event_timestamp: Option<u64> = None;
+        if let Some(event_meta_data) = event[0].meta.clone() {
+            let block_id = web3::types::BlockId::from(event_meta_data.block_hash);
+            let block_info = self.web3.eth().block(block_id).await.unwrap();
+            if let Some(block_data) = block_info {
+                event_timestamp = Some(block_data.timestamp.as_u64());
+            } else {
+                tracing::error!("Unable to retrieve auction starting point");
+            };
+        } else {
+            tracing::error!("Unable to retrieve auction starting point");
+        };
         let order = Order {
             sell_amount: U256::from(event[0].data.auctioned_sell_amount),
             buy_amount: U256::from(event[0].data.min_buy_amount),
             user_id: 0_u64, // todo: set correctly
         };
-        Ok(order)
+        Ok(DataFromEvent {
+            order,
+            timestamp: event_timestamp.unwrap_or(0_u64),
+        })
     }
     async fn get_order_claims_between_blocks(
         &self,
