@@ -20,7 +20,7 @@ fn main() {
     generate_contract(
         "EasyAuction",
         hashmap! {
-            4 => Address::from_str("dC5f67d34aB3489b5bfD34645B7271615FAcdfA2").unwrap(),
+            4 => Address::from_str("99e63218201e44549AB8a6Fa220e1018FDB48f79").unwrap(),
         },
     );
 }

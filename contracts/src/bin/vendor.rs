@@ -16,11 +16,11 @@ const NPM_CONTRACTS: &[(&str, &str)] = &[
         "ERC20.json",
     ),
     (
-        "@gnosis.pm/ido-contracts@0.2.1/build/artifacts/contracts/test/ERC20Mintable.sol/ERC20Mintable.json",
+        "@gnosis.pm/ido-contracts@0.3.0/build/artifacts/contracts/test/ERC20Mintable.sol/ERC20Mintable.json",
         "ERC20Mintable.json",
     ),
     (
-        "@gnosis.pm/ido-contracts@0.2.1/deployments/rinkeby/EasyAuction.json",
+        "@gnosis.pm/ido-contracts@0.3.0/deployments/rinkeby/EasyAuction.json",
         "EasyAuction.json",
     ),
 ];
