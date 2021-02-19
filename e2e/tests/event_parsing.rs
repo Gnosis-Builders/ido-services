@@ -69,7 +69,8 @@ async fn test_with_ganache() {
             (10_u128).checked_pow(18).unwrap(),
             U256::from_str("1").unwrap(),
             U256::from_str("1").unwrap(),
-            false
+            false,
+            "0000000000000000000000000000000000000000".parse().unwrap()
         )
     );
     // Place Order
@@ -90,6 +91,7 @@ async fn test_with_ganache() {
             vec![(10_u128).checked_pow(18).unwrap()],
             vec![(10_u128).checked_pow(18).unwrap().checked_mul(2).unwrap()],
             vec![queue_start_as_hex],
+            "0x".into(),
         )
     );
 
