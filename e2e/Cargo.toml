@@ -7,7 +7,7 @@ edition = "2018"
 contracts = { path = "../contracts" }
 hex-literal = "0.3"
 hex = { version = "0.4", default-features = false }
-ethcontract = { version = "0.9",  default-features = false, features = ["http"] }
+ethcontract = { version = "0.11.1",  default-features = false, features = ["http"] }
 model = { path = "../model" }
 orderbook = { path = "../orderbook" }
 secp256k1 = "0.20"

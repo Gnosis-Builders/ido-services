@@ -14,11 +14,11 @@ tokio = { version = "0.2", features =[ "macros", "time"] }
 tracing = "0.1"
 tracing-setup = { path = "../tracing-setup" }
 contracts = { path = "../contracts" }
-primitive-types = { version = "0.7" }
+primitive-types = { version = "0.8" }
 structopt = { version = "0.3", default-features = false }
 url = "2.2"
-ethcontract = "0.9.1"
-web3 = { version = "0.13", default-features = false, features = ["http-tls"] }
+ethcontract = "0.11.1"
+web3 = { version = "0.15", default-features = false, features = ["http-tls"] }
 futures = "0.3.8"
 lazy_static = "1.4"
 warp = "0.2"

@@ -1,4 +1,4 @@
-use ethcontract_generate::{Address, Builder};
+use ethcontract_generate::{Address, Builder, TransactionHash};
 use maplit::hashmap;
 use std::{collections::HashMap, env, fs, path::Path, str::FromStr};
 
@@ -20,12 +20,15 @@ fn main() {
     generate_contract(
         "EasyAuction",
         hashmap! {
-            4 => Address::from_str("99e63218201e44549AB8a6Fa220e1018FDB48f79").unwrap(),
+            4 => (Address::from_str("99e63218201e44549AB8a6Fa220e1018FDB48f79").unwrap(), Some("0x1719a22ec302cc15f2130731c88580dbd19be8292573b0b7a2d1455c41ab6867".parse().unwrap())),
         },
     );
 }
 
-fn generate_contract(name: &str, deployment_overrides: HashMap<u32, Address>) {
+fn generate_contract(
+    name: &str,
+    deployment_overrides: HashMap<u32, (Address, Option<TransactionHash>)>,
+) {
     let artifact = paths::contract_artifacts_dir().join(format!("{}.json", name));
     let address_file = paths::contract_address_file(name);
     let dest = env::var("OUT_DIR").unwrap();
@@ -42,8 +45,8 @@ fn generate_contract(name: &str, deployment_overrides: HashMap<u32, Address>) {
         builder = builder.add_deployment_str(5777, address.trim());
     }
 
-    for (network_id, address) in deployment_overrides.into_iter() {
-        builder = builder.add_deployment(network_id, address);
+    for (network_id, (address, transaction_hash)) in deployment_overrides.into_iter() {
+        builder = builder.add_deployment(network_id, address, transaction_hash);
     }
 
     builder
