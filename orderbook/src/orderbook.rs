@@ -330,6 +330,11 @@ impl Orderbook {
                 .auction_data(U256::from(auction_id))
                 .call()
                 .await?;
+            let auction_allow_list_contract = event_reader
+                .contract
+                .auction_access_manager(U256::from(auction_id))
+                .call()
+                .await?;
             let address_auctioning_token: Address = auction_data.0;
             let address_bidding_token: Address = auction_data.1;
             let event_data = event_reader.get_auction_info_from_event(auction_id).await?;
@@ -347,6 +352,10 @@ impl Orderbook {
                 .order
                 .to_price_point(decimals_bidding_token, decimals_auctioning_token)
                 .invert_price();
+            let mut is_private_auction = true;
+            if auction_allow_list_contract.0 == [0u8; 20] {
+                is_private_auction = false;
+            }
             let details = AuctionDetails {
                 auction_id,
                 order: price_point,
@@ -359,6 +368,7 @@ impl Orderbook {
                 end_time_timestamp: auction_data.3.as_u64(),
                 starting_timestamp: event_data.timestamp,
                 current_clearing_price: price_point.price,
+                is_private_auction,
             };
             self.set_auction_details(auction_id, details).await?;
             let mut order_hashmap = self.initial_order.write().await;
