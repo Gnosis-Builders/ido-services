@@ -356,6 +356,7 @@ impl Orderbook {
             if auction_allow_list_contract.0 == [0u8; 20] {
                 is_private_auction = false;
             }
+            let chain_id = event_reader.web3.eth().chain_id().await?;
             let details = AuctionDetails {
                 auction_id,
                 order: price_point,
@@ -369,6 +370,7 @@ impl Orderbook {
                 starting_timestamp: event_data.timestamp,
                 current_clearing_price: price_point.price,
                 is_private_auction,
+                chain_id,
             };
             self.set_auction_details(auction_id, details).await?;
             let mut order_hashmap = self.initial_order.write().await;

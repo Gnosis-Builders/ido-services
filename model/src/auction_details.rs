@@ -20,6 +20,7 @@ pub struct AuctionDetails {
     pub starting_timestamp: u64,
     pub current_clearing_price: f64,
     pub is_private_auction: bool,
+    pub chain_id: U256,
 }
 
 impl AuctionDetails {
