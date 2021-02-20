@@ -21,6 +21,7 @@ fn main() {
         "EasyAuction",
         hashmap! {
             4 => (Address::from_str("99e63218201e44549AB8a6Fa220e1018FDB48f79").unwrap(), Some("0x1719a22ec302cc15f2130731c88580dbd19be8292573b0b7a2d1455c41ab6867".parse().unwrap())),
+            100 => (Address::from_str("67Ce8491BaFE98D24B502f9a79772972CBC38989").unwrap(), Some("0x2cd993cc652feac51164e677784d41a2e0379fb98d5b15ed420e205d75b09517".parse().unwrap())),
         },
     );
 }
