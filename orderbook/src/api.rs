@@ -17,6 +17,7 @@ pub fn handle_all_routes(
     let get_details_of_most_interesting_auctions =
         filter::get_details_of_most_interesting_auctions(orderbook.clone());
     let get_all_auction_with_details = filter::get_all_auction_with_details(orderbook.clone());
+    let get_auction_with_details = filter::get_auction_with_details(orderbook.clone());
     let get_all_auction_with_details_with_user_participation =
         filter::get_all_auction_with_details_with_user_participation(orderbook);
     warp::path!("api" / "v1" / ..).and(
@@ -27,6 +28,7 @@ pub fn handle_all_routes(
             .or(get_clearing_order_and_volume)
             .or(get_details_of_most_interesting_auctions)
             .or(get_all_auction_with_details)
+            .or(get_auction_with_details)
             .or(get_all_auction_with_details_with_user_participation),
     )
 }

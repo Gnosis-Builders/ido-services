@@ -508,6 +508,10 @@ impl Orderbook {
         }
         Ok(auction_detail_list)
     }
+    pub async fn get_auction_with_details(&self, auction_id: u64) -> Result<AuctionDetails> {
+        let auction_details_hashmap = self.auction_details.read().await;
+        Ok(auction_details_hashmap.get(&auction_id).unwrap().clone())
+    }
     pub async fn update_current_price_of_details(&self, auction_id: u64, price: f64) -> Result<()> {
         let mut auction_details_hashmap = self.auction_details.write().await;
         match auction_details_hashmap.entry(auction_id) {
