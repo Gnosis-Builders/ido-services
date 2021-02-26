@@ -21,10 +21,11 @@ pub struct AuctionDetails {
     pub current_clearing_price: f64,
     pub is_private_auction: bool,
     pub chain_id: U256,
+    pub interest_score: f64,
 }
 
 impl AuctionDetails {
-    fn bidding_volume(&self) -> f64 {
+    pub fn bidding_volume(&self) -> f64 {
         self.order.volume * self.order.price
     }
 }
