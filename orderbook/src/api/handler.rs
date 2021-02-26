@@ -88,6 +88,19 @@ pub async fn get_all_auction_with_details(
         Ok(auction_detail_data) => Ok(with_status(json(&auction_detail_data), StatusCode::OK)),
     }
 }
+pub async fn get_auction_with_details(
+    auction_id: u64,
+    orderbook: Arc<Orderbook>,
+) -> Result<impl warp::Reply, Infallible> {
+    let auction_detail_data = orderbook.get_auction_with_details(auction_id).await;
+    match auction_detail_data {
+        Err(err) => Ok(with_status(
+            json(&format!("{:}", err)),
+            StatusCode::BAD_REQUEST,
+        )),
+        Ok(auction_detail_data) => Ok(with_status(json(&auction_detail_data), StatusCode::OK)),
+    }
+}
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
