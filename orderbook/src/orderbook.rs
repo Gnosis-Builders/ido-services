@@ -371,6 +371,7 @@ impl Orderbook {
                 current_clearing_price: price_point.price,
                 is_private_auction,
                 chain_id,
+                interest_score: 0_f64,
             };
             self.set_auction_details(auction_id, details).await?;
             let mut order_hashmap = self.initial_order.write().await;
@@ -473,6 +474,7 @@ impl Orderbook {
                 .price,
         )
         .await?;
+        self.update_interest_score(auction_id).await?;
         Ok(())
     }
     pub async fn get_most_interesting_auctions(
@@ -513,6 +515,16 @@ impl Orderbook {
         match auction_details_hashmap.entry(auction_id) {
             Entry::Occupied(mut details) => {
                 details.get_mut().current_clearing_price = price;
+            }
+            Entry::Vacant(_) => {}
+        }
+        Ok(())
+    }
+    pub async fn update_interest_score(&self, auction_id: u64) -> Result<()> {
+        let mut auction_details_hashmap = self.auction_details.write().await;
+        match auction_details_hashmap.entry(auction_id) {
+            Entry::Occupied(mut details) => {
+                details.get_mut().interest_score = details.get().bidding_volume();
             }
             Entry::Vacant(_) => {}
         }
