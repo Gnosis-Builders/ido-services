@@ -2,6 +2,7 @@ use anyhow::Result;
 use contracts::EasyAuction;
 use ethcontract::BlockNumber;
 use model::order::Order;
+use model::order::OrderWithAuctionID;
 use model::user::User;
 use primitive_types::U256;
 use tracing::info;
@@ -13,9 +14,9 @@ pub struct EventReader {
 }
 
 pub struct OrderUpdates {
-    pub orders_added: Vec<Order>,
-    pub orders_removed: Vec<Order>,
-    pub orders_claimed: Vec<Order>,
+    pub orders_added: Vec<OrderWithAuctionID>,
+    pub orders_removed: Vec<OrderWithAuctionID>,
+    pub orders_claimed: Vec<OrderWithAuctionID>,
     pub users_added: Vec<User>,
     pub last_block_handled: u64,
 }
@@ -35,20 +36,19 @@ impl EventReader {
     pub async fn get_order_updates(
         &self,
         last_handled_block: u64,
-        auction_id: u64,
         reorg_protection: bool,
     ) -> Result<OrderUpdates> {
         let (from_block, to_block) = self
-            .get_to_block(last_handled_block, auction_id, reorg_protection)
+            .get_to_block(last_handled_block, reorg_protection)
             .await?;
         let orders_added = self
-            .get_order_placements_between_blocks(from_block, to_block, auction_id)
+            .get_order_placements_between_blocks(from_block, to_block)
             .await?;
         let orders_removed = self
-            .get_cancellations_between_blocks(from_block, to_block, auction_id)
+            .get_cancellations_between_blocks(from_block, to_block)
             .await?;
         let orders_claimed = self
-            .get_order_claims_between_blocks(from_block, to_block, auction_id)
+            .get_order_claims_between_blocks(from_block, to_block)
             .await?;
         let users_added = self
             .get_new_users_between_blocks(from_block, to_block)
@@ -66,16 +66,14 @@ impl EventReader {
         &self,
         from_block: u64,
         to_block: u64,
-        auction_id: u64,
-    ) -> Result<Vec<Order>> {
-        let mut orders = Vec::new();
+    ) -> Result<Vec<OrderWithAuctionID>> {
+        let mut order_updates = Vec::new();
         let events = self
             .contract
             .events()
             .new_sell_order()
             .from_block(BlockNumber::Number(from_block.into()))
             .to_block(BlockNumber::Number(to_block.into()))
-            .auction_id(U256::from(auction_id).into())
             .query()
             .await?;
         for event in events {
@@ -84,9 +82,13 @@ impl EventReader {
                 buy_amount: U256::from(event.data.buy_amount),
                 user_id: event.data.user_id as u64,
             };
-            orders.push(order);
+            let order_update = OrderWithAuctionID {
+                auction_id: event.data.auction_id.as_u64(),
+                order: order,
+            };
+            order_updates.push(order_update);
         }
-        Ok(orders)
+        Ok(order_updates)
     }
 
     pub async fn get_auction_info_from_event(&self, auction_id: u64) -> Result<DataFromEvent> {
@@ -124,16 +126,14 @@ impl EventReader {
         &self,
         from_block: u64,
         to_block: u64,
-        auction_id: u64,
-    ) -> Result<Vec<Order>> {
-        let mut orders = Vec::new();
+    ) -> Result<Vec<OrderWithAuctionID>> {
+        let mut order_updates = Vec::new();
         let events = self
             .contract
             .events()
             .claimed_from_order()
             .from_block(BlockNumber::Number(from_block.into()))
             .to_block(BlockNumber::Number(to_block.into()))
-            .auction_id(U256::from(auction_id).into())
             .query()
             .await?;
         for event in events {
@@ -142,9 +142,13 @@ impl EventReader {
                 buy_amount: U256::from(event.data.buy_amount),
                 user_id: event.data.user_id as u64,
             };
-            orders.push(order);
+            let order_update = OrderWithAuctionID {
+                auction_id: event.data.auction_id.as_u64(),
+                order,
+            };
+            order_updates.push(order_update);
         }
-        Ok(orders)
+        Ok(order_updates)
     }
 
     async fn get_new_users_between_blocks(
@@ -174,7 +178,6 @@ impl EventReader {
     async fn get_to_block(
         &self,
         last_handled_block: u64,
-        auction_id: u64,
         reorg_protection: bool,
     ) -> Result<(u64, u64)> {
         let current_block = self.web3.eth().block_number().await?.as_u64();
@@ -187,8 +190,8 @@ impl EventReader {
             anyhow::bail!("Benign Error: from_block > to_block for updating events")
         }
         info!(
-            "Updating event based orderbook from block {} to block {} for auctionId {}.",
-            from_block, to_block, auction_id,
+            "Updating event based orderbook from block {} to block {} ",
+            from_block, to_block,
         );
         Ok((from_block, to_block))
     }
@@ -197,16 +200,14 @@ impl EventReader {
         &self,
         from_block: u64,
         to_block: u64,
-        auction_id: u64,
-    ) -> Result<Vec<Order>> {
-        let mut orders = Vec::new();
+    ) -> Result<Vec<OrderWithAuctionID>> {
+        let mut order_updates = Vec::new();
         let events = self
             .contract
             .events()
             .cancellation_sell_order()
             .from_block(BlockNumber::Number(from_block.into()))
             .to_block(BlockNumber::Number(to_block.into()))
-            .auction_id(U256::from(auction_id).into())
             .query()
             .await?;
         for event in events {
@@ -215,8 +216,12 @@ impl EventReader {
                 buy_amount: U256::from(event.data.buy_amount),
                 user_id: event.data.user_id as u64,
             };
-            orders.push(order);
+            let order_update = OrderWithAuctionID {
+                auction_id: event.data.auction_id.as_u64(),
+                order,
+            };
+            order_updates.push(order_update);
         }
-        Ok(orders)
+        Ok(order_updates)
     }
 }

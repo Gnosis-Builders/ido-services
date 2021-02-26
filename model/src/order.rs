@@ -15,6 +15,12 @@ pub struct Order {
     pub user_id: u64,
 }
 
+#[derive(Eq, PartialEq, Clone, Debug, Copy, Default)]
+pub struct OrderWithAuctionID {
+    pub auction_id: u64,
+    pub order: Order,
+}
+
 #[derive(Default, Debug, Serialize)]
 pub struct OrderbookDisplay {
     pub asks: Vec<PricePoint>,
