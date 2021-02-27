@@ -84,7 +84,7 @@ impl EventReader {
             };
             let order_update = OrderWithAuctionID {
                 auction_id: event.data.auction_id.as_u64(),
-                order: order,
+                order,
             };
             order_updates.push(order_update);
         }

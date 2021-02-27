@@ -84,10 +84,7 @@ pub async fn orderbook_maintenance(
             let mut orderbook = orderbook_latest.initial_order.write().await;
             let orderbook_reorg_save = orderbook_reorg_protected.initial_order.read().await;
             for auction_id in orderbook_reorg_save.keys() {
-                orderbook.insert(
-                    *auction_id,
-                    orderbook_reorg_save.get(auction_id).unwrap().clone(),
-                );
+                orderbook.insert(*auction_id, *orderbook_reorg_save.get(auction_id).unwrap());
             }
             let mut orderbook = orderbook_latest.auction_details.write().await;
             let orderbook_reorg_save = orderbook_reorg_protected.auction_details.read().await;
