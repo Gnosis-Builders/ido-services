@@ -2,7 +2,6 @@ use contracts::EasyAuction;
 use orderbook::event_reader::EventReader;
 use orderbook::orderbook::Orderbook;
 use orderbook::serve_task;
-use std::collections::HashMap;
 use std::num::ParseFloatError;
 use std::sync::Arc;
 use std::{net::SocketAddr, time::Duration};
@@ -47,13 +46,16 @@ pub async fn orderbook_maintenance(
     orderbook_reorg_protected: Arc<Orderbook>,
     event_reader: EventReader,
 ) -> ! {
-    let mut last_block_considered_for_reorg_protected_orderbook = HashMap::new();
+    let mut last_block_considered_for_reorg_protected_orderbook = 0u64;
+    let mut last_auction_id_considered_for_reorg_protected_orderbook = 1u64;
+
     loop {
         tracing::debug!("running order book maintenance with reorg protection");
         orderbook_reorg_protected
             .run_maintenance(
                 &event_reader,
                 &mut last_block_considered_for_reorg_protected_orderbook,
+                &mut last_auction_id_considered_for_reorg_protected_orderbook,
                 true,
             )
             .await
@@ -73,6 +75,19 @@ pub async fn orderbook_maintenance(
                 .orders_without_claimed
                 .read()
                 .await;
+            for auction_id in orderbook_reorg_save.keys() {
+                orderbook.insert(
+                    *auction_id,
+                    orderbook_reorg_save.get(auction_id).unwrap().clone(),
+                );
+            }
+            let mut orderbook = orderbook_latest.initial_order.write().await;
+            let orderbook_reorg_save = orderbook_reorg_protected.initial_order.read().await;
+            for auction_id in orderbook_reorg_save.keys() {
+                orderbook.insert(*auction_id, *orderbook_reorg_save.get(auction_id).unwrap());
+            }
+            let mut orderbook = orderbook_latest.auction_details.write().await;
+            let orderbook_reorg_save = orderbook_reorg_protected.auction_details.read().await;
             for auction_id in orderbook_reorg_save.keys() {
                 orderbook.insert(
                     *auction_id,
@@ -101,6 +116,7 @@ pub async fn orderbook_maintenance(
             .run_maintenance(
                 &event_reader,
                 &mut last_block_considered_for_reorg_protected_orderbook.clone(), // Values are cloned, as we don't wanna store the values.
+                &mut last_auction_id_considered_for_reorg_protected_orderbook.clone(),
                 false,
             )
             .await

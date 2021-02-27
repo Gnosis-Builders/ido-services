@@ -3,7 +3,7 @@ use anyhow::Result;
 use ethcontract::Address;
 use lazy_static::lazy_static;
 use model::auction_details::AuctionDetails;
-use model::order::{Order, OrderbookDisplay, PricePoint};
+use model::order::{Order, OrderWithAuctionID, OrderbookDisplay, PricePoint};
 use model::user::User;
 use primitive_types::H160;
 use primitive_types::U256;
@@ -391,7 +391,8 @@ impl Orderbook {
     pub async fn run_maintenance(
         &self,
         event_reader: &EventReader,
-        last_block_considered_per_auction_id: &mut HashMap<u64, u64>,
+        last_block_considered: &mut u64,
+        last_auction_index_considered: &mut u64,
         reorg_protection: bool,
     ) -> Result<()> {
         let max_auction_id = event_reader
@@ -400,7 +401,8 @@ impl Orderbook {
             .call()
             .await
             .unwrap_or_else(|_| U256::zero());
-        for auction_id in 1..=(max_auction_id.low_u64()) {
+
+        for auction_id in *last_auction_index_considered..=(max_auction_id.low_u64()) {
             if let Err(err) = self
                 .initial_setup_if_not_yet_done(auction_id, event_reader)
                 .await
@@ -412,39 +414,58 @@ impl Orderbook {
                     );
                 break;
             };
-            let new_orders: Vec<Order>;
-            let canceled_orders: Vec<Order>;
-            let new_claimed_orders: Vec<Order>;
-            let new_users: Vec<User>;
-            let last_block_considered = *last_block_considered_per_auction_id
-                .get(&auction_id)
-                .unwrap_or(&(1_u64));
-            match event_reader
-                .get_order_updates(last_block_considered, auction_id, reorg_protection)
-                .await
-            {
-                Ok(order_updates) => {
-                    new_orders = order_updates.orders_added;
-                    canceled_orders = order_updates.orders_removed;
-                    new_claimed_orders = order_updates.orders_claimed;
-                    new_users = order_updates.users_added;
-                    last_block_considered_per_auction_id
-                        .insert(auction_id, order_updates.last_block_handled);
-                }
-                Err(err) => {
-                    tracing::info!(
-                        "get_order_updates was not successful for auction_id {:?} with error: {:}",
-                        auction_id,
-                        err
-                    );
-                    break;
-                }
+            *last_auction_index_considered = max_auction_id.low_u64();
+        }
+
+        let new_orders: Vec<OrderWithAuctionID>;
+        let canceled_orders: Vec<OrderWithAuctionID>;
+        let new_claimed_orders: Vec<OrderWithAuctionID>;
+        let new_users: Vec<User>;
+        match event_reader
+            .get_order_updates(*last_block_considered, reorg_protection)
+            .await
+        {
+            Ok(order_updates) => {
+                new_orders = order_updates.orders_added;
+                canceled_orders = order_updates.orders_removed;
+                new_claimed_orders = order_updates.orders_claimed;
+                new_users = order_updates.users_added;
+                *last_block_considered = order_updates.last_block_handled;
             }
-            self.insert_users(new_users).await;
-            self.insert_orders(auction_id, new_orders).await;
-            self.remove_orders(auction_id, canceled_orders).await;
-            self.remove_claimed_orders(auction_id, new_claimed_orders)
-                .await;
+            Err(err) => {
+                tracing::info!("get_order_updates was not successful with error: {:}", err);
+                return Ok(());
+            }
+        }
+        self.insert_users(new_users).await;
+        for auction_id in 1..=(max_auction_id.low_u64()) {
+            self.insert_orders(
+                auction_id,
+                new_orders
+                    .iter()
+                    .filter(|order_with_auction_id| order_with_auction_id.auction_id == auction_id)
+                    .map(|order_with_auction_id| order_with_auction_id.order)
+                    .collect(),
+            )
+            .await;
+            self.remove_orders(
+                auction_id,
+                canceled_orders
+                    .iter()
+                    .filter(|order_with_auction_id| order_with_auction_id.auction_id == auction_id)
+                    .map(|order_with_auction_id| order_with_auction_id.order)
+                    .collect(),
+            )
+            .await;
+            self.remove_claimed_orders(
+                auction_id,
+                new_claimed_orders
+                    .iter()
+                    .filter(|order_with_auction_id| order_with_auction_id.auction_id == auction_id)
+                    .map(|order_with_auction_id| order_with_auction_id.order)
+                    .collect(),
+            )
+            .await;
             self.sort_orders(auction_id).await;
             self.update_clearing_price_info(auction_id).await?;
         }
