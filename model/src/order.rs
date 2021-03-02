@@ -56,11 +56,15 @@ impl Order {
         decimals_buy_token: U256,
         decimals_sell_token: U256,
     ) -> PricePoint {
-        let price_denominator = self
+        let mut price_denominator = self
             .buy_amount
             .checked_mul(TEN.pow(decimals_sell_token))
             .expect("buy_amount should not overflow")
             .to_f64_lossy();
+        // avoid special case where we would divide by zero
+        if price_denominator == 0_f64 {
+            price_denominator = 1_f64;
+        }
         let price_numerator = self
             .sell_amount
             .checked_mul(TEN.pow(decimals_buy_token))
