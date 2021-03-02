@@ -15,7 +15,6 @@ use tokio::sync::RwLock;
 pub struct Orderbook {
     pub orders: RwLock<HashMap<u64, Vec<Order>>>,
     pub orders_without_claimed: RwLock<HashMap<u64, Vec<Order>>>,
-    pub initial_order: RwLock<HashMap<u64, Order>>,
     pub users: RwLock<HashMap<Address, u64>>,
     pub auction_participation: RwLock<HashMap<u64, HashSet<u64>>>,
     pub auction_details: RwLock<HashMap<u64, AuctionDetails>>,
@@ -33,13 +32,15 @@ impl Orderbook {
         Orderbook {
             orders: RwLock::new(HashMap::new()),
             orders_without_claimed: RwLock::new(HashMap::new()),
-            initial_order: RwLock::new(HashMap::new()),
             users: RwLock::new(HashMap::new()),
             auction_participation: RwLock::new(HashMap::new()),
             auction_details: RwLock::new(HashMap::new()),
         }
     }
     pub async fn insert_orders(&self, auction_id: u64, orders: Vec<Order>) {
+        if orders.is_empty() {
+            return;
+        }
         {
             let mut hashmap = self.orders.write().await;
             match hashmap.entry(auction_id) {
@@ -85,26 +86,31 @@ impl Orderbook {
         }
     }
     pub async fn insert_users(&self, users: Vec<User>) {
+        if users.is_empty() {
+            return;
+        }
         let mut hashmap = self.users.write().await;
         for user in users {
             hashmap.insert(user.address, user.user_id);
         }
     }
-    pub async fn get_initial_order(&self, auction_id: u64) -> Order {
-        let order_hashmap = self.initial_order.read().await;
-        if let Some(order) = order_hashmap.get(&auction_id) {
-            *order
-        } else {
-            *QUEUE_START
-        }
-    }
     pub async fn update_initial_order(&mut self, auction_id: u64, order: Order) {
-        let mut order_hashmap = self.initial_order.write().await;
-        order_hashmap.insert(auction_id, order);
-    }
-    pub async fn is_initial_order_set(&self, auction_id: u64) -> bool {
-        let order_hashmap = self.initial_order.read().await;
-        order_hashmap.contains_key(&auction_id)
+        let mut hashmap = self.auction_details.write().await;
+        match hashmap.entry(auction_id) {
+            Entry::Occupied(mut auction_details) => {
+                auction_details.get_mut().exact_order = order;
+            }
+            Entry::Vacant(_) => {
+                hashmap.insert(
+                    auction_id,
+                    AuctionDetails {
+                        auction_id,
+                        exact_order: order,
+                        ..Default::default()
+                    },
+                );
+            }
+        }
     }
     pub async fn sort_orders(&self, auction_id: u64) {
         let mut hashmap = self.orders.write().await;
@@ -116,6 +122,9 @@ impl Orderbook {
         }
     }
     pub async fn remove_orders(&self, auction_id: u64, orders: Vec<Order>) {
+        if orders.is_empty() {
+            return;
+        }
         {
             let mut hashmap = self.orders.write().await;
             match hashmap.entry(auction_id) {
@@ -136,6 +145,9 @@ impl Orderbook {
         }
     }
     pub async fn remove_claimed_orders(&self, auction_id: u64, orders: Vec<Order>) -> bool {
+        if orders.is_empty() {
+            return true;
+        }
         let mut hashmap = self.orders_without_claimed.write().await;
         match hashmap.entry(auction_id) {
             Entry::Occupied(order_vec) => {
@@ -143,6 +155,14 @@ impl Orderbook {
                 true
             }
             Entry::Vacant(_) => false,
+        }
+    }
+    pub async fn get_initial_order(&self, auction_id: u64) -> Order {
+        let auction_details_hashmap = self.auction_details.read().await;
+        if let Some(auction_details) = auction_details_hashmap.get(&auction_id) {
+            auction_details.exact_order
+        } else {
+            *QUEUE_START
         }
     }
     pub async fn get_order_book_display(&self, auction_id: u64) -> Result<OrderbookDisplay> {
@@ -319,66 +339,6 @@ impl Orderbook {
         }
         smaller_order
     }
-    pub async fn initial_setup_if_not_yet_done(
-        &self,
-        auction_id: u64,
-        event_reader: &EventReader,
-    ) -> Result<()> {
-        if !self.is_initial_order_set(auction_id).await {
-            let auction_data = event_reader
-                .contract
-                .auction_data(U256::from(auction_id))
-                .call()
-                .await?;
-            let auction_allow_list_contract = event_reader
-                .contract
-                .auction_access_manager(U256::from(auction_id))
-                .call()
-                .await?;
-            let address_auctioning_token: Address = auction_data.0;
-            let address_bidding_token: Address = auction_data.1;
-            let event_data = event_reader.get_auction_info_from_event(auction_id).await?;
-            let bidding_erc20_contract =
-                contracts::ERC20::at(&event_reader.web3, address_bidding_token);
-            let auctioning_erc20_contract =
-                contracts::ERC20::at(&event_reader.web3, address_auctioning_token);
-            let symbol_auctioning_token = auctioning_erc20_contract.symbol().call().await?;
-            let decimals_auctioning_token =
-                U256::from(auctioning_erc20_contract.decimals().call().await?);
-            let symbol_bidding_token = bidding_erc20_contract.symbol().call().await?;
-            let decimals_bidding_token =
-                U256::from(auctioning_erc20_contract.decimals().call().await?);
-            let price_point = event_data
-                .order
-                .to_price_point(decimals_bidding_token, decimals_auctioning_token)
-                .invert_price();
-            let mut is_private_auction = true;
-            if auction_allow_list_contract.0 == [0u8; 20] {
-                is_private_auction = false;
-            }
-            let chain_id = event_reader.web3.eth().chain_id().await?;
-            let details = AuctionDetails {
-                auction_id,
-                order: price_point,
-                symbol_auctioning_token,
-                symbol_bidding_token,
-                address_bidding_token,
-                address_auctioning_token,
-                decimals_auctioning_token,
-                decimals_bidding_token,
-                end_time_timestamp: auction_data.3.as_u64(),
-                starting_timestamp: event_data.timestamp,
-                current_clearing_price: price_point.price,
-                is_private_auction,
-                chain_id,
-                interest_score: 0_f64,
-            };
-            self.set_auction_details(auction_id, details).await?;
-            let mut order_hashmap = self.initial_order.write().await;
-            order_hashmap.insert(auction_id, event_data.order);
-        }
-        Ok(())
-    }
     pub async fn set_auction_details(
         &self,
         auction_id: u64,
@@ -388,49 +348,56 @@ impl Orderbook {
         auction_details.insert(auction_id, details);
         Ok(())
     }
+    pub async fn get_max_auction_id(&self) -> Result<u64> {
+        let auction_details = self.auction_details.read().await;
+        let max_auction_id = auction_details.keys().max().unwrap_or(&0_u64);
+        Ok(*max_auction_id)
+    }
     pub async fn run_maintenance(
         &self,
         event_reader: &EventReader,
         last_block_considered: &mut u64,
-        last_auction_index_considered: &mut u64,
         reorg_protection: bool,
     ) -> Result<()> {
-        let max_auction_id = event_reader
-            .contract
-            .auction_counter()
-            .call()
+        let (from_block, to_block);
+        match event_reader
+            .get_to_block(*last_block_considered, reorg_protection)
             .await
-            .unwrap_or_else(|_| U256::zero());
-
-        for auction_id in *last_auction_index_considered..=(max_auction_id.low_u64()) {
-            if let Err(err) = self
-                .initial_setup_if_not_yet_done(auction_id, event_reader)
-                .await
-            {
-                tracing::error!(
-                        "update_initial_order_if_not_set was not successful for auction_id {:?} with error: {:}",
-                        auction_id,
-                        err
-                    );
-                break;
-            };
-            *last_auction_index_considered = max_auction_id.low_u64();
+        {
+            Ok(return_data) => {
+                from_block = return_data.0;
+                to_block = return_data.1
+            }
+            Err(err) => {
+                tracing::info!("get_to_block was not successful with error: {:}", err);
+                return Ok(());
+            }
         }
 
+        let new_auctions: Vec<AuctionDetails>;
+        match event_reader.get_auction_updates(from_block, to_block).await {
+            Ok(auction_updates) => {
+                new_auctions = auction_updates;
+            }
+            Err(err) => {
+                tracing::info!("get_order_updates was not successful with error: {:}", err);
+                return Ok(());
+            }
+        }
+        for auction_details in new_auctions {
+            self.set_auction_details(auction_details.auction_id, auction_details)
+                .await?;
+        }
         let new_orders: Vec<OrderWithAuctionID>;
         let canceled_orders: Vec<OrderWithAuctionID>;
         let new_claimed_orders: Vec<OrderWithAuctionID>;
         let new_users: Vec<User>;
-        match event_reader
-            .get_order_updates(*last_block_considered, reorg_protection)
-            .await
-        {
+        match event_reader.get_order_updates(from_block, to_block).await {
             Ok(order_updates) => {
                 new_orders = order_updates.orders_added;
                 canceled_orders = order_updates.orders_removed;
                 new_claimed_orders = order_updates.orders_claimed;
                 new_users = order_updates.users_added;
-                *last_block_considered = order_updates.last_block_handled;
             }
             Err(err) => {
                 tracing::info!("get_order_updates was not successful with error: {:}", err);
@@ -438,7 +405,9 @@ impl Orderbook {
             }
         }
         self.insert_users(new_users).await;
-        for auction_id in 1..=(max_auction_id.low_u64()) {
+
+        let max_auction_id = self.get_max_auction_id().await?;
+        for auction_id in 1..=max_auction_id {
             self.insert_orders(
                 auction_id,
                 new_orders
@@ -469,6 +438,7 @@ impl Orderbook {
             self.sort_orders(auction_id).await;
             self.update_clearing_price_info(auction_id).await?;
         }
+        *last_block_considered = to_block;
         Ok(())
     }
     pub async fn update_clearing_price_info(&self, auction_id: u64) -> Result<()> {
@@ -516,6 +486,7 @@ impl Orderbook {
             }
         }
         non_closed_auctions.sort();
+        non_closed_auctions.reverse();
         if non_closed_auctions.len() > number_of_auctions as usize {
             non_closed_auctions = non_closed_auctions[0..(number_of_auctions as usize)].to_vec()
         }

@@ -103,13 +103,11 @@ async fn test_with_ganache() {
     );
     let event_reader = EventReader::new(easy_auction, web3);
     let mut last_block_considered = 1u64;
-    let mut last_auction_id_considered = 1u64;
 
     orderbook::orderbook::Orderbook::run_maintenance(
         &orderbook,
         &event_reader,
         &mut last_block_considered,
-        &mut last_auction_id_considered,
         false,
     )
     .await
@@ -139,7 +137,6 @@ async fn test_with_ganache() {
         &orderbook,
         &event_reader,
         &mut last_block_considered,
-        &mut last_auction_id_considered,
         false,
     )
     .await

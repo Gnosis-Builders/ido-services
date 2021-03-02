@@ -1,4 +1,4 @@
-use super::order::PricePoint;
+use super::order::{Order, PricePoint};
 use ethcontract::Address;
 use primitive_types::U256;
 use serde::{Deserialize, Serialize};
@@ -10,6 +10,7 @@ use std::cmp::PartialOrd;
 pub struct AuctionDetails {
     pub auction_id: u64,
     pub order: PricePoint,
+    pub exact_order: Order,
     pub symbol_auctioning_token: String,
     pub symbol_bidding_token: String,
     pub address_auctioning_token: Address,
@@ -36,7 +37,7 @@ impl AuctionDetails {
 
 impl PartialEq for AuctionDetails {
     fn eq(&self, other: &Self) -> bool {
-        float_cmp::approx_eq!(f64, self.bidding_volume(), other.bidding_volume(), ulps = 2)
+        float_cmp::approx_eq!(f64, self.interest_score, other.interest_score, ulps = 2)
     }
 }
 impl Eq for AuctionDetails {}
@@ -49,7 +50,7 @@ impl PartialOrd for AuctionDetails {
 
 impl Ord for AuctionDetails {
     fn cmp(&self, other: &Self) -> Ordering {
-        if float_cmp::approx_eq!(f64, self.bidding_volume(), other.bidding_volume(), ulps = 2) {
+        if self.interest_score <= other.interest_score {
             Ordering::Less
         } else {
             Ordering::Greater
