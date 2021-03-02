@@ -120,6 +120,7 @@ impl EventReader {
                 minimum_bidding_amount_per_order: event.data.minimum_bidding_amount_per_order,
                 min_funding_threshold: event.data.min_funding_threshold,
                 allow_list_manager: event.data.allow_list_manager,
+                order_cancellation_end_date: event.data.order_cancellation_end_date.as_u64(),
                 end_time_timestamp: event.data.auction_end_date.as_u64(),
                 starting_timestamp: event_timestamp.unwrap_or(0_u64),
                 current_clearing_price: price_point.price,

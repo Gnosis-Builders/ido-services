@@ -18,6 +18,7 @@ pub struct AuctionDetails {
     pub decimals_auctioning_token: U256,
     pub decimals_bidding_token: U256,
     pub end_time_timestamp: u64,
+    pub order_cancellation_end_date: u64,
     pub starting_timestamp: u64,
     pub minimum_bidding_amount_per_order: U256,
     pub min_funding_threshold: U256,
