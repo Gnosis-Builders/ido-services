@@ -1,10 +1,12 @@
 use anyhow::Result;
 use contracts::EasyAuction;
+use ethcontract::Address;
 use ethcontract::BlockNumber;
+use model::auction_details::AuctionDetails;
 use model::order::Order;
 use model::order::OrderWithAuctionID;
 use model::user::User;
-use primitive_types::U256;
+use primitive_types::{H160, U256};
 use tracing::info;
 use web3::Web3;
 
@@ -33,14 +35,7 @@ impl EventReader {
         Self { contract, web3 }
     }
 
-    pub async fn get_order_updates(
-        &self,
-        last_handled_block: u64,
-        reorg_protection: bool,
-    ) -> Result<OrderUpdates> {
-        let (from_block, to_block) = self
-            .get_to_block(last_handled_block, reorg_protection)
-            .await?;
+    pub async fn get_order_updates(&self, from_block: u64, to_block: u64) -> Result<OrderUpdates> {
         let orders_added = self
             .get_order_placements_between_blocks(from_block, to_block)
             .await?;
@@ -60,6 +55,77 @@ impl EventReader {
             users_added,
             last_block_handled: to_block,
         })
+    }
+    pub async fn get_auction_updates(
+        &self,
+        from_block: u64,
+        to_block: u64,
+    ) -> Result<Vec<AuctionDetails>> {
+        let mut new_auction = Vec::new();
+        let events = self
+            .contract
+            .events()
+            .new_auction()
+            .from_block(BlockNumber::Number(from_block.into()))
+            .to_block(BlockNumber::Number(to_block.into()))
+            .query()
+            .await?;
+        for event in events {
+            let mut event_timestamp: Option<u64> = None;
+            if let Some(event_meta_data) = event.meta.clone() {
+                let block_id = web3::types::BlockId::from(event_meta_data.block_hash);
+                let block_info = self.web3.eth().block(block_id).await?;
+                if let Some(block_data) = block_info {
+                    event_timestamp = Some(block_data.timestamp.as_u64());
+                } else {
+                    tracing::error!("Unable to retrieve auction starting point");
+                };
+            } else {
+                tracing::error!("Unable to retrieve auction starting point");
+            };
+            let order = Order {
+                sell_amount: U256::from(event.data.auctioned_sell_amount),
+                buy_amount: U256::from(event.data.min_buy_amount),
+                user_id: 0_u64, // todo: set correctly
+            };
+            let address_auctioning_token: Address = event.data.auctioning_token;
+            let address_bidding_token: Address = event.data.bidding_token;
+            let bidding_erc20_contract = contracts::ERC20::at(&self.web3, address_bidding_token);
+            let auctioning_erc20_contract =
+                contracts::ERC20::at(&self.web3, address_auctioning_token);
+            let symbol_auctioning_token = auctioning_erc20_contract.symbol().call().await?;
+            let decimals_auctioning_token =
+                U256::from(auctioning_erc20_contract.decimals().call().await?);
+            let symbol_bidding_token = bidding_erc20_contract.symbol().call().await?;
+            let decimals_bidding_token =
+                U256::from(auctioning_erc20_contract.decimals().call().await?);
+            let price_point = order
+                .to_price_point(decimals_bidding_token, decimals_auctioning_token)
+                .invert_price();
+            let mut is_private_auction = true;
+            if event.data.allow_list_manager == H160::from([0u8; 20]) {
+                is_private_auction = false;
+            }
+            let chain_id = &self.web3.eth().chain_id().await?;
+            new_auction.push(AuctionDetails {
+                auction_id: event.data.auction_id.as_u64(),
+                order: price_point,
+                exact_order: order,
+                symbol_auctioning_token,
+                symbol_bidding_token,
+                address_bidding_token,
+                address_auctioning_token,
+                decimals_auctioning_token,
+                decimals_bidding_token,
+                end_time_timestamp: event.data.auction_end_date.as_u64(),
+                starting_timestamp: event_timestamp.unwrap_or(0_u64),
+                current_clearing_price: price_point.price,
+                is_private_auction,
+                chain_id: *chain_id,
+                interest_score: 0_f64,
+            });
+        }
+        Ok(new_auction)
     }
 
     async fn get_order_placements_between_blocks(
@@ -91,37 +157,6 @@ impl EventReader {
         Ok(order_updates)
     }
 
-    pub async fn get_auction_info_from_event(&self, auction_id: u64) -> Result<DataFromEvent> {
-        let event = self
-            .contract
-            .events()
-            .new_auction()
-            .from_block(BlockNumber::Number(1_u64.into()))
-            .auction_id(U256::from(auction_id).into())
-            .query()
-            .await?;
-        let mut event_timestamp: Option<u64> = None;
-        if let Some(event_meta_data) = event[0].meta.clone() {
-            let block_id = web3::types::BlockId::from(event_meta_data.block_hash);
-            let block_info = self.web3.eth().block(block_id).await.unwrap();
-            if let Some(block_data) = block_info {
-                event_timestamp = Some(block_data.timestamp.as_u64());
-            } else {
-                tracing::error!("Unable to retrieve auction starting point");
-            };
-        } else {
-            tracing::error!("Unable to retrieve auction starting point");
-        };
-        let order = Order {
-            sell_amount: U256::from(event[0].data.auctioned_sell_amount),
-            buy_amount: U256::from(event[0].data.min_buy_amount),
-            user_id: 0_u64, // todo: set correctly
-        };
-        Ok(DataFromEvent {
-            order,
-            timestamp: event_timestamp.unwrap_or(0_u64),
-        })
-    }
     async fn get_order_claims_between_blocks(
         &self,
         from_block: u64,
@@ -175,7 +210,7 @@ impl EventReader {
         Ok(users)
     }
 
-    async fn get_to_block(
+    pub async fn get_to_block(
         &self,
         last_handled_block: u64,
         reorg_protection: bool,
