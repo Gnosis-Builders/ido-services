@@ -9,8 +9,7 @@ use lazy_static::lazy_static;
 use primitive_types::{H160, H256};
 use serde::{de, Deserialize, Serialize};
 use serde::{Deserializer, Serializer};
-use std::fmt;
-use std::fmt::Display;
+use std::fmt::{Debug, Display, Formatter};
 use std::str::FromStr;
 use web3::signing;
 
@@ -63,7 +62,7 @@ impl FromStr for Signature {
 }
 
 impl Display for Signature {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let mut bytes = [0u8; 65 * 2];
         // Can only fail if the buffer size does not match but we know it is correct.
         hex::encode_to_slice(&self.to_bytes(), &mut bytes).unwrap();
@@ -89,7 +88,7 @@ impl<'de> Deserialize<'de> for Signature {
 #[derive(Copy, Eq, PartialEq, Clone, Default)]
 pub struct DomainSeparator(pub [u8; 32]);
 
-impl std::str::FromStr for DomainSeparator {
+impl FromStr for DomainSeparator {
     type Err = FromHexError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
@@ -97,8 +96,8 @@ impl std::str::FromStr for DomainSeparator {
     }
 }
 
-impl std::fmt::Debug for DomainSeparator {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+impl Debug for DomainSeparator {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let mut hex = [0u8; 64];
         // Unwrap because we know the length is correct.
         hex::encode_to_slice(self.0, &mut hex).unwrap();
@@ -145,10 +144,22 @@ mod tests {
         let domain_separator_rinkeby =
             DomainSeparator::get_domain_separator(chain_id, contract_address);
         // domain separator is taken from rinkeby deployment at address 91D6387ffbB74621625F39200d91a50386C9Ab15
-        let expected_domain_separator: DomainSeparator = DomainSeparator(hex!(
+        let expected_domain_separator = DomainSeparator(hex!(
             "ef81736805e079cbd2261d46a8b80d018644aa78b3bc9ae635f0c4baf0fa6c90"
         ));
         assert_eq!(domain_separator_rinkeby, expected_domain_separator);
+    }
+
+    #[test]
+    fn domain_separator_debug() {
+        let expected_domain_separator = DomainSeparator(hex!(
+            "ef81736805e079cbd2261d46a8b80d018644aa78b3bc9ae635f0c4baf0fa6c90"
+        ));
+        let domain_separator_from_str = DomainSeparator::from_str(
+            "ef81736805e079cbd2261d46a8b80d018644aa78b3bc9ae635f0c4baf0fa6c90",
+        )
+        .unwrap();
+        assert_eq!(domain_separator_from_str, expected_domain_separator);
     }
 
     #[test]
