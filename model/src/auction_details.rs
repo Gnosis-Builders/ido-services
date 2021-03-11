@@ -23,6 +23,7 @@ pub struct AuctionDetails {
     pub minimum_bidding_amount_per_order: U256,
     pub min_funding_threshold: U256,
     pub allow_list_manager: Address,
+    pub allow_list_signer: Address,
     pub current_clearing_price: f64,
     pub is_private_auction: bool,
     pub chain_id: U256,

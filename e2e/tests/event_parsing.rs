@@ -1,5 +1,5 @@
 use contracts::{ERC20Mintable, EasyAuction};
-use ethcontract::prelude::{Account, Address, Http, Web3, U256};
+use ethcontract::prelude::{Account, Address, BlockNumber, Http, Web3, U256};
 use model::order::PricePoint;
 use orderbook::event_reader::EventReader;
 use orderbook::orderbook::{Orderbook, QUEUE_START};
@@ -58,19 +58,33 @@ async fn test_with_ganache() {
         auctioneer,
         token_a.approve(easy_auction.address(), to_wei(100))
     );
+    let mut current_time_stamp = Some(0u64);
+    let block_info = web3
+        .eth()
+        .block(ethcontract::BlockId::Number(BlockNumber::Latest))
+        .await
+        .unwrap();
+    if let Some(block_data) = block_info {
+        current_time_stamp = Some(block_data.timestamp.as_u64());
+    }
     tx!(
         auctioneer,
         easy_auction.initiate_auction(
             token_a.address(),
             token_b.address(),
-            U256::from_str("3600").unwrap(),
-            U256::from_str("3600").unwrap(),
+            U256::from(current_time_stamp.unwrap())
+                .checked_add(U256::from_str("3600").unwrap())
+                .unwrap(),
+            U256::from(current_time_stamp.unwrap())
+                .checked_add(U256::from_str("3600").unwrap())
+                .unwrap(),
             (10_u128).checked_pow(18).unwrap(),
             (10_u128).checked_pow(18).unwrap(),
             U256::from_str("1").unwrap(),
             U256::from_str("1").unwrap(),
             false,
-            Address::zero()
+            Address::zero(),
+            Vec::new(),
         )
     );
     // Place Order

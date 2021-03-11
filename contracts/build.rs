@@ -20,8 +20,8 @@ fn main() {
     generate_contract(
         "EasyAuction",
         hashmap! {
-            4 => (Address::from_str("99e63218201e44549AB8a6Fa220e1018FDB48f79").unwrap(), Some("0x1719a22ec302cc15f2130731c88580dbd19be8292573b0b7a2d1455c41ab6867".parse().unwrap())),
-            100 => (Address::from_str("67Ce8491BaFE98D24B502f9a79772972CBC38989").unwrap(), Some("0x2cd993cc652feac51164e677784d41a2e0379fb98d5b15ed420e205d75b09517".parse().unwrap())),
+            4 => (Address::from_str("307C1384EFeF241d6CBBFb1F85a04C54307Ac9F6").unwrap(), Some("0xecf8358d08dfdbd9549c0affa2226b062fe78867f156a258bd9da1e05ad842aa".parse().unwrap())),
+            100 => (Address::from_str("9BacE46438b3f3e0c06d67f5C1743826EE8e87DA").unwrap(), Some("0x7304d6dfe40a8b5a97c6579743733139dd50c3b4a7d39181fd7c24ac28c3986f".parse().unwrap())),
         },
     );
 }
