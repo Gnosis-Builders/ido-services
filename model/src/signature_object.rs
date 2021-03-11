@@ -33,7 +33,7 @@ impl SignaturePackage {
         signer: Address,
     ) -> Result<bool> {
         let v = self.signature.v & 0x1f;
-        let message = self.signing_digest_typed_data(domain_separator, user, auction_id);
+        let message = signing_digest_typed_data(domain_separator, user, auction_id);
         let recovery = Recovery::new(message, v as u64, self.signature.r, self.signature.s);
         if let Some(recovery_data) = recovery.as_signature() {
             return Ok(
@@ -43,35 +43,34 @@ impl SignaturePackage {
         }
         Ok(false)
     }
+}
 
-    // Implements the following hardhat function
-    // hardhatRuntime.ethers.utils.defaultAbiCoder.encode(
-    //     ["bytes32", "address", "uint256"],
-    //     [
-    //       hardhatRuntime.ethers.utils._TypedDataEncoder.hashDomain(
-    //         contractDomain,
-    //       ),
-    //       address,
-    //       taskArgs.auctionId,
-    //     ],
-    // plus signMessage, which hashes b"\x19Ethereum Signed Message:\n32"
-    // and the message hash
-    fn signing_digest_typed_data(
-        &self,
-        domain_separator: &DomainSeparator,
-        user: Address,
-        auction_id: u64,
-    ) -> [u8; 32] {
-        let mut hash_data = [0u8; 96];
-        hash_data[0..32].copy_from_slice(&domain_separator.0);
-        hash_data[44..64].copy_from_slice(user.as_bytes());
-        hash_data[88..96].copy_from_slice(&(auction_id.to_be_bytes()[..]));
-        let message_hash = signing::keccak256(&hash_data);
-        let mut hash_data = [0u8; 60];
-        hash_data[0..28].copy_from_slice(b"\x19Ethereum Signed Message:\n32");
-        hash_data[28..60].copy_from_slice(&message_hash);
-        signing::keccak256(&hash_data)
-    }
+// Implements the following ethers.io function
+// hardhatRuntime.ethers.utils.defaultAbiCoder.encode(
+//     ["bytes32", "address", "uint256"],
+//     [
+//       hardhatRuntime.ethers.utils._TypedDataEncoder.hashDomain(
+//         contractDomain,
+//       ),
+//       address,
+//       taskArgs.auctionId,
+//     ],
+// plus signMessage, which hashes b"\x19Ethereum Signed Message:\n32"
+// and the message hash
+fn signing_digest_typed_data(
+    domain_separator: &DomainSeparator,
+    user: Address,
+    auction_id: u64,
+) -> [u8; 32] {
+    let mut hash_data = [0u8; 96];
+    hash_data[0..32].copy_from_slice(&domain_separator.0);
+    hash_data[44..64].copy_from_slice(user.as_bytes());
+    hash_data[88..96].copy_from_slice(&(auction_id.to_be_bytes()[..]));
+    let message_hash = signing::keccak256(&hash_data);
+    let mut hash_data = [0u8; 60];
+    hash_data[0..28].copy_from_slice(b"\x19Ethereum Signed Message:\n32");
+    hash_data[28..60].copy_from_slice(&message_hash);
+    signing::keccak256(&hash_data)
 }
 
 #[cfg(test)]
