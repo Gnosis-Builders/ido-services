@@ -1,5 +1,6 @@
 use anyhow::Result;
 use contracts::EasyAuction;
+use ethabi::ParamType;
 use ethcontract::Address;
 use ethcontract::BlockNumber;
 use model::auction_details::AuctionDetails;
@@ -103,7 +104,15 @@ impl EventReader {
                 .to_price_point(decimals_bidding_token, decimals_auctioning_token)
                 .invert_price();
             let mut is_private_auction = true;
-            if event.data.allow_list_manager == H160::from([0u8; 20]) {
+            let allow_list_signer: Address =
+                ethabi::decode(&[ParamType::Address], &event.data.allow_list_data)
+                    .unwrap_or_else(|_| vec![ethabi::Token::Address(H160::zero())])
+                    .get(0)
+                    .unwrap()
+                    .clone()
+                    .into_address()
+                    .unwrap();
+            if event.data.allow_list_contract == H160::from([0u8; 20]) {
                 is_private_auction = false;
             }
             let chain_id = &self.web3.eth().chain_id().await?;
@@ -119,7 +128,8 @@ impl EventReader {
                 decimals_bidding_token,
                 minimum_bidding_amount_per_order: event.data.minimum_bidding_amount_per_order,
                 min_funding_threshold: event.data.min_funding_threshold,
-                allow_list_manager: event.data.allow_list_manager,
+                allow_list_manager: event.data.allow_list_contract,
+                allow_list_signer,
                 order_cancellation_end_date: event.data.order_cancellation_end_date.as_u64(),
                 end_time_timestamp: event.data.auction_end_date.as_u64(),
                 starting_timestamp: event_timestamp.unwrap_or(0_u64),

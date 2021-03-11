@@ -70,7 +70,8 @@ async fn test_with_ganache() {
             U256::from_str("1").unwrap(),
             U256::from_str("1").unwrap(),
             false,
-            Address::zero()
+            Address::zero(),
+            vec![0u8, 0u8],
         )
     );
     // Place Order

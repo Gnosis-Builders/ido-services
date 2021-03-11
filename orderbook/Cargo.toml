@@ -24,6 +24,8 @@ lazy_static = "1.4"
 warp = "0.2"
 serde = { version = "1.0", features = ["derive"] }
 hex = "0.4.3"
+ethabi = "13.0.0"
+
 
 
 [dev-dependencies]
