@@ -1,5 +1,6 @@
 pub mod auction_details;
 pub mod order;
+pub mod signature_object;
 pub mod user;
 
 use ethabi::{encode, Token};
