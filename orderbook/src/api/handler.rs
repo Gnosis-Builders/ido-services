@@ -1,13 +1,113 @@
 use crate::api::filter::H160Wrapper;
 use crate::orderbook::Orderbook;
+use crate::signatures::SignatureStore;
 use model::auction_details::AuctionDetails;
 use model::order::Order;
+use model::signature_object::SignaturesObject;
+use model::DomainSeparator;
 use serde::{Deserialize, Serialize};
 use std::{convert::Infallible, sync::Arc};
+use warp::Filter;
+use warp::Rejection;
 use warp::{
     http::StatusCode,
     reply::{json, with_status},
 };
+
+const MAX_JSON_BODY_PAYLOAD: u64 = 1024 * 16; // rejecting more than 16k uploads
+
+pub fn extract_signatures_object_from_json(
+) -> impl Filter<Extract = (SignaturesObject,), Error = Rejection> + Clone {
+    // (rejecting huge payloads)...
+    warp::body::content_length_limit(MAX_JSON_BODY_PAYLOAD).and(warp::body::json())
+}
+
+pub async fn get_signature(
+    auction_id: u64,
+    user: H160Wrapper,
+    signatures: Arc<SignatureStore>,
+) -> Result<impl warp::Reply, Infallible> {
+    if let Some(signature) = signatures.get_signature(auction_id, user.0).await {
+        Ok(with_status(json(&signature), StatusCode::OK))
+    } else {
+        Ok(with_status(
+            json(&format!("Signature not available for user {:}", user.0)),
+            StatusCode::BAD_REQUEST,
+        ))
+    }
+}
+pub async fn provide_signatures(
+    orderbook: Arc<Orderbook>,
+    signatures: Arc<SignatureStore>,
+    signature_object: SignaturesObject,
+) -> Result<impl warp::Reply, Infallible> {
+    let orderbook = orderbook.clone();
+    let event_details;
+    let event_details_obj = orderbook
+        .get_auction_with_details(signature_object.auction_id)
+        .await;
+    if let Err(err) = &event_details_obj {
+        return Ok(with_status(
+            json(&format!("Internal error: {:?}", err)),
+            StatusCode::BAD_REQUEST,
+        ));
+    } else {
+        event_details = event_details_obj.unwrap();
+    }
+    if event_details.chain_id.as_u64() != signature_object.chain_id {
+        return Ok(with_status(
+            json(&format!(
+                "Wrong chain id. This API talks to the chain id {:?}",
+                event_details.chain_id.as_u64()
+            )),
+            StatusCode::BAD_REQUEST,
+        ));
+    }
+    if event_details.allow_list_manager != signature_object.allow_list_contract {
+        return Ok(with_status(
+            json(&format!(
+                "Wrong allow list contract used. Auction is scheduled with {:?}",
+                event_details.allow_list_manager
+            )),
+            StatusCode::BAD_REQUEST,
+        ));
+    }
+    for signature_pair in signature_object.signatures.clone() {
+        let signature_ok = signature_pair.validate_signature(
+            &DomainSeparator::get_domain_separator(
+                signature_object.chain_id,
+                signature_object.allow_list_contract,
+            ),
+            signature_pair.user,
+            signature_object.auction_id,
+            event_details.allow_list_signer,
+        );
+        if let Err(err) = signature_ok {
+            return Ok(with_status(
+                json(&format!(
+                    "Error {:?} while decoding signature {:?} for user {:?} ",
+                    err, signature_pair.signature, signature_pair.user
+                )),
+                StatusCode::BAD_REQUEST,
+            ));
+        } else if !signature_ok.unwrap() {
+            return Ok(with_status(
+                json(&format!(
+                    "Signature {:?} for user {:?} is not valid",
+                    signature_pair.signature, signature_pair.user
+                )),
+                StatusCode::BAD_REQUEST,
+            ));
+        }
+    }
+    signatures
+        .insert_signatures(signature_object.auction_id, signature_object.signatures)
+        .await;
+    Ok(with_status(
+        json(&"All signatures added".to_string()),
+        StatusCode::OK,
+    ))
+}
 
 pub async fn get_previous_order(
     auction_id: u64,

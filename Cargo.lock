@@ -1386,6 +1386,7 @@ dependencies = [
  "float-cmp",
  "futures",
  "hex",
+ "hex-literal",
  "lazy_static",
  "model",
  "primitive-types",
