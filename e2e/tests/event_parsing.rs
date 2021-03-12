@@ -44,7 +44,7 @@ async fn test_with_ganache() {
     // Fetch deployed instances
     let easy_auction = EasyAuction::at(
         &web3,
-        "e78a0f7e598cc8b0bb87894b0f60dd2a88d6a8ab".parse().unwrap(),
+        "5b1869d9a4c187f2eaa108f3062412ecf0526b24".parse().unwrap(),
     );
     let auction_id = U256::from_dec_str("1").unwrap();
     // Create & Mint tokens to trade
