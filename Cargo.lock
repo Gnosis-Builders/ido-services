@@ -1234,6 +1234,8 @@ dependencies = [
 name = "model"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
+ "ethabi",
  "ethcontract",
  "float-cmp",
  "hex",
@@ -1241,6 +1243,8 @@ dependencies = [
  "lazy_static",
  "primitive-types",
  "serde",
+ "serde_json",
+ "web3",
 ]
 
 [[package]]
