@@ -8,6 +8,7 @@ use model::order::Order;
 use model::order::OrderWithAuctionID;
 use model::user::User;
 use primitive_types::{H160, U256};
+use std::convert::TryInto;
 use tracing::info;
 use web3::Web3;
 
@@ -104,14 +105,7 @@ impl EventReader {
                 .to_price_point(decimals_bidding_token, decimals_auctioning_token)
                 .invert_price();
             let mut is_private_auction = true;
-            let allow_list_signer: Address =
-                ethabi::decode(&[ParamType::Address], &event.data.allow_list_data)
-                    .unwrap_or_else(|_| vec![ethabi::Token::Address(H160::zero())])
-                    .get(0)
-                    .unwrap()
-                    .clone()
-                    .into_address()
-                    .unwrap();
+            let allow_list_signer: Address = get_address_from_bytes(event.data.allow_list_data);
             if event.data.allow_list_contract == H160::from([0u8; 20]) {
                 is_private_auction = false;
             }
@@ -272,5 +266,43 @@ impl EventReader {
             order_updates.push(order_update);
         }
         Ok(order_updates)
+    }
+}
+
+fn get_address_from_bytes(input: Vec<u8>) -> ethcontract::H160 {
+    if input.len() == 32 {
+        return ethabi::decode(&[ParamType::Address], &input)
+            .unwrap_or_else(|_| vec![ethabi::Token::Address(H160::zero())])
+            .get(0)
+            .unwrap()
+            .clone()
+            .into_address()
+            .unwrap();
+    } else if input.len() == 20 {
+        let vec_as_array: [u8; 20] = input.try_into().unwrap_or_else(|v: Vec<u8>| {
+            panic!("Expected a Vec of length {} but it was {}", 4, v.len())
+        });
+        return ethcontract::H160::from(vec_as_array);
+    }
+    ethcontract::H160::zero()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use hex_literal::hex;
+
+    #[test]
+    fn abi_decode_bytes() {
+        let vec_u8_short: Vec<u8> = hex!("740a98f8f4fae0986fb3264fe4aacf94ac1ee96f").to_vec();
+        let vec_u8_long: Vec<u8> =
+            hex!("000000000000000000000000740a98f8f4fae0986fb3264fe4aacf94ac1ee96f").to_vec();
+
+        let address_from_long: Address = get_address_from_bytes(vec_u8_long);
+        let address_from_short: Address = get_address_from_bytes(vec_u8_short);
+
+        let original_address: H160 = "740a98f8f4fae0986fb3264fe4aacf94ac1ee96f".parse().unwrap();
+        assert_eq!(address_from_long, original_address);
+        assert_eq!(address_from_short, original_address);
     }
 }

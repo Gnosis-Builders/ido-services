@@ -2,12 +2,17 @@ mod filter;
 mod handler;
 
 use crate::orderbook::Orderbook;
+use crate::signatures::SignatureStore;
 use std::sync::Arc;
 use warp::Filter;
 
 pub fn handle_all_routes(
     orderbook: Arc<Orderbook>,
+    signatures: Arc<SignatureStore>,
 ) -> impl Filter<Extract = (impl warp::Reply,), Error = warp::Rejection> + Clone {
+    let get_signature = filter::get_signature(signatures.clone());
+    let provide_signatures_object =
+        filter::provide_signatures_object(orderbook.clone(), signatures.clone());
     let get_previous_order = filter::get_previous_order(orderbook.clone());
     let get_order_book_display_data = filter::get_order_book_display_data(orderbook.clone());
     let get_user_orders = filter::get_user_orders(orderbook.clone());
@@ -29,6 +34,8 @@ pub fn handle_all_routes(
             .or(get_details_of_most_interesting_auctions)
             .or(get_all_auction_with_details)
             .or(get_auction_with_details)
-            .or(get_all_auction_with_details_with_user_participation),
+            .or(get_all_auction_with_details_with_user_participation)
+            .or(get_signature)
+            .or(provide_signatures_object),
     )
 }
