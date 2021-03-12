@@ -1,6 +1,7 @@
 pub mod api;
 pub mod event_reader;
 pub mod orderbook;
+pub mod signatures;
 
 use crate::orderbook::Orderbook;
 use std::{net::SocketAddr, sync::Arc};
