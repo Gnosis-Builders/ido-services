@@ -372,7 +372,7 @@ pub mod test_util {
         let signature_store_arc = Arc::new(signature_store);
         let filter = provide_signatures_object(Arc::new(orderbook), signature_store_arc.clone());
         let response = request()
-            .path(&format!("/provide_signature"))
+            .path(&"/provide_signature".to_string())
             .method("POST")
             .json(&deserialized_signatures)
             .reply(&filter)
