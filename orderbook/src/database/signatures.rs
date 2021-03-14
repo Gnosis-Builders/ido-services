@@ -87,11 +87,11 @@ mod tests {
         let auction_id = 1u64;
         let user_address = H160::zero();
         let signature = Signature::default();
-        db.insert_signature((auction_id as u32).into(), user_address, &signature)
+        db.insert_signature(auction_id as u32, user_address, &signature)
             .await
             .unwrap();
         assert!(db
-            .insert_signature((auction_id as u32).into(), user_address, &signature)
+            .insert_signature(auction_id as u32, user_address, &signature)
             .await
             .is_err());
     }
@@ -111,7 +111,7 @@ mod tests {
         let value = String::from("0x000000000000000000000000000000000000000000000000000000000000001b772598c8cbf75630449d3edfd4dcddd2eab9e2fc2f854de5f17f58742fa3b55a090a5212d1decfa0c0b43e7466e1b1bb623a3a8ec4ac53adc87b6b905f8676f9");
         let signature = Signature::from_str(&value).unwrap();
 
-        db.insert_signature((auction_id as u32).into(), user_address, &signature)
+        db.insert_signature(auction_id as u32, user_address, &signature)
             .await
             .unwrap();
         assert_eq!(
