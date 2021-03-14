@@ -1,4 +1,5 @@
 pub mod api;
+pub mod database;
 pub mod event_reader;
 pub mod orderbook;
 pub mod signatures;

@@ -21,8 +21,9 @@ The tests that require postgres connect to the default database of locally runni
 
 ```sh
 # Docker
-docker run -e POSTGRES_PASSWORD=password -e POSTGRES_USER=user -p 5432:5432 postgres
+docker run -e POSTGRES_PASSWORD=password -e POSTGRES_USER=`whoami` -p 5432:5432 postgres
 
+where whoami is the result from the terminal command `whoami`
 # Service
 sudo systemctl start postgresql.service
 sudo -u postgres createuser $USER
@@ -39,7 +40,7 @@ postgres -D data
 createdb -h localhost $USER
 
 # Finally for all methods to test that the server is reachable and to set the schema for the tests.
-docker build --tag gp-v2-migrations -f docker/Dockerfile.migration .
+docker build --tag ido-migrations -f docker/Dockerfile.migration .
 # If you are running postgres in locally, your URL is `localhost` instead of `host.docker.internal`
-docker run -ti -e FLYWAY_URL="jdbc:postgresql://host.docker.internal/?user=user&password=password" -v $PWD/database/sql:/flyway/sql ido-migrations migrate
+docker run -ti -e FLYWAY_URL="jdbc:postgresql://host.docker.internal/?user='whoami'" -v $PWD/database/sql:/flyway/sql ido-migrations migrate
 ```

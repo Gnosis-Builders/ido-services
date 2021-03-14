@@ -31,6 +31,7 @@ impl Signature {
     }
 
     pub fn from_bytes(bytes: &[u8; 65]) -> Self {
+        println!("{:?}", bytes);
         Signature {
             r: H256::from_slice(&bytes[1..33]),
             s: H256::from_slice(&bytes[33..65]),
