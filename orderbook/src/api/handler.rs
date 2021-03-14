@@ -1,10 +1,13 @@
 use crate::api::filter::H160Wrapper;
+use crate::database::Database;
+use crate::database::SignatureFilter;
 use crate::orderbook::Orderbook;
-use crate::signatures::SignatureStore;
+use futures::TryStreamExt;
 use model::auction_details::AuctionDetails;
 use model::order::Order;
 use model::signature_object::SignaturesObject;
 use model::DomainSeparator;
+use model::Signature;
 use serde::{Deserialize, Serialize};
 use std::{convert::Infallible, sync::Arc};
 use warp::Filter;
@@ -25,20 +28,36 @@ pub fn extract_signatures_object_from_json(
 pub async fn get_signature(
     auction_id: u64,
     user: H160Wrapper,
-    signatures: Arc<SignatureStore>,
+    db: Database,
 ) -> Result<impl warp::Reply, Infallible> {
-    if let Some(signature) = signatures.get_signature(auction_id, user.0).await {
-        Ok(with_status(json(&signature), StatusCode::OK))
+    if let Ok(signature) = db
+        .get_signatures(&SignatureFilter {
+            auction_id: (auction_id as u32),
+            user_address: Some(user.0),
+        })
+        .try_collect::<Vec<Signature>>()
+        .await
+    {
+        if signature.len() != 1 {
+            return Ok(with_status(
+                json(&format!("Signature not available for user {:}", user.0)),
+                StatusCode::BAD_REQUEST,
+            ));
+        }
+        Ok(with_status(json(&signature[0]), StatusCode::OK))
     } else {
         Ok(with_status(
-            json(&format!("Signature not available for user {:}", user.0)),
+            json(&format!(
+                "Could not retrieve signature for user {:}",
+                user.0
+            )),
             StatusCode::BAD_REQUEST,
         ))
     }
 }
 pub async fn provide_signatures(
     orderbook: Arc<Orderbook>,
-    signatures: Arc<SignatureStore>,
+    db: Database,
     signature_object: SignaturesObject,
 ) -> Result<impl warp::Reply, Infallible> {
     let orderbook = orderbook.clone();
@@ -100,9 +119,18 @@ pub async fn provide_signatures(
             ));
         }
     }
-    signatures
+    if let Err(err) = db
         .insert_signatures(signature_object.auction_id, signature_object.signatures)
-        .await;
+        .await
+    {
+        return Ok(with_status(
+            json(&format!(
+                "Error {:?} while inserting data into database ",
+                err
+            )),
+            StatusCode::BAD_REQUEST,
+        ));
+    }
     Ok(with_status(
         json(&"All signatures added".to_string()),
         StatusCode::OK,

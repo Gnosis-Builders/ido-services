@@ -1,7 +1,7 @@
 use super::handler;
 use crate::api::handler::extract_signatures_object_from_json;
+use crate::database::Database;
 use crate::orderbook::Orderbook;
-use crate::signatures::SignatureStore;
 use hex::{FromHex, FromHexError};
 use model::order::Order;
 use primitive_types::H160;
@@ -15,9 +15,9 @@ fn with_orderbook(
 }
 
 fn with_signatures(
-    signatures: Arc<SignatureStore>,
-) -> impl Filter<Extract = (Arc<SignatureStore>,), Error = std::convert::Infallible> + Clone {
-    warp::any().map(move || signatures.clone())
+    db: Database,
+) -> impl Filter<Extract = (Database,), Error = std::convert::Infallible> + Clone {
+    warp::any().map(move || db.clone())
 }
 /// Wraps H160 with FromStr that can handle a `0x` prefix.
 /// Unfortunately, it is public, since I was unable to map in filter get_user_orders
@@ -109,21 +109,21 @@ pub fn get_all_auction_with_details_with_user_participation(
 }
 
 pub fn get_signature(
-    signatures: Arc<SignatureStore>,
+    db: Database,
 ) -> impl Filter<Extract = (impl warp::Reply,), Error = warp::Rejection> + Clone {
     warp::path!("get_signature" / u64 / H160Wrapper)
         .and(warp::get())
-        .and(with_signatures(signatures))
+        .and(with_signatures(db))
         .and_then(handler::get_signature)
 }
 pub fn provide_signatures_object(
     orderbook: Arc<Orderbook>,
-    signatures: Arc<SignatureStore>,
+    db: Database,
 ) -> impl Filter<Extract = (impl warp::Reply,), Error = warp::Rejection> + Clone {
     warp::path!("provide_signature")
         .and(warp::post())
         .and(with_orderbook(orderbook))
-        .and(with_signatures(signatures))
+        .and(with_signatures(db))
         .and(extract_signatures_object_from_json())
         .and_then(handler::provide_signatures)
 }
@@ -132,6 +132,8 @@ pub fn provide_signatures_object(
 pub mod test_util {
     use super::*;
     use crate::api::handler::AuctionDetailsForUser;
+    use crate::database::SignatureFilter;
+    use futures::TryStreamExt;
     use model::auction_details::AuctionDetails;
     use model::signature_object::SignaturePackage;
     use model::signature_object::SignaturesObject;
@@ -303,8 +305,8 @@ pub mod test_util {
     }
 
     #[tokio::test]
+    #[ignore]
     async fn get_signature_() {
-        let signature_store = SignatureStore::default();
         let auction_id: u64 = 1;
         let signature = Signature {
             v: 1,
@@ -319,16 +321,18 @@ pub mod test_util {
             address: "740a98F8f4fAe0986FB3264Fe4aaCf94ac1EE96f".parse().unwrap(),
             user_id: 10_u64,
         };
-        signature_store
-            .insert_signatures(
-                auction_id,
-                vec![SignaturePackage {
-                    user: user.address,
-                    signature,
-                }],
-            )
-            .await;
-        let filter = get_signature(Arc::new(signature_store));
+        let db = Database::new("postgresql://").unwrap();
+        db.clear().await.unwrap();
+        db.insert_signatures(
+            auction_id,
+            vec![SignaturePackage {
+                user: user.address,
+                signature,
+            }],
+        )
+        .await
+        .unwrap();
+        let filter = get_signature(db);
         let response = request()
             .path(&format!(
                 "/get_signature/{:}/{:}",
@@ -343,11 +347,11 @@ pub mod test_util {
         assert_eq!(response_sig, signature);
     }
     #[tokio::test]
+    #[ignore]
     async fn provide_new_signatures() {
-        let signature_store = SignatureStore::default();
         let orderbook = Orderbook::default();
         let request_json = json!(
-            {"auctionId":1,"chainId":4,"allowListContract":"0xed52BE1b0071C2f27D10fCc06Ef2e0194cF4E18D","signatures":[{"user":"0x740a98F8f4fAe0986FB3264Fe4aaCf94ac1EE96f","signature":"0x000000000000000000000000000000000000000000000000000000000000001cd5bab0f0dde607f56475301709e2ef5afafef9e59474f572e2321ca05e65a8030acf896a7cff87c470945fd73c8c958c8067dc2c754f72fca7f6038ec2b3bb97"},{"user":"0x04668ec2f57cc15c381b461b9fedab5d451c8f7f","signature":"0x000000000000000000000000000000000000000000000000000000000000001ce63ad8ae9cab71ee08664e9b54c511eb27ad66e2be94ff4199c83d1eff673df2308e604dc8dd4710cef236ccabb16d29cd1830f9c276e570476488cf71e9bebd"}]}); // {"auctionId":1,"chainId":4,"allowListContract":"0xed52BE1b0071C2f27D10fCc06Ef2e0194cF4E18D","signatures":[{"user":"0x740a98F8f4fAe0986FB3264Fe4aaCf94ac1EE96f","signature":"0x000000000000000000000000000000000000000000000000000000000000001b6e5cf2c8aad4817e6fdd674bdfb82ab3aeff34c6a5b26d238f79d8173e7d62714704d23bd2632ff6e1682567ed7fbe943694ec45810d5f87cd93828063fead8a"},{"user":"0x04668ec2f57cc15c381b461b9fedab5d451c8f7f","signature":"0x000000000000000000000000000000000000000000000000000000000000001c0b248f8378c255c3c355b3e4608636f84e26df8e1a8e1975c5ddad85f2f2dacb746ea0232445018cb2b8d174ce333d4b3b06c0e21548a4a77f727dc4051c2e25"}]} );
+            {"auctionId":10,"chainId":4,"allowListContract":"0x80b8AcA4689EC911F048c4E0976892cCDE14031E","signatures":[{"user":"0x740a98F8f4fAe0986FB3264Fe4aaCf94ac1EE96f","signature":"0x000000000000000000000000000000000000000000000000000000000000001ba38d84751ba93f1b448f137a5755abbd23c22de5b5bcaa05c71b23b79e7423fa5916a4239781aa33c851a9a5c9335dacbc30f9761992597cc9c53f2f39e5ec41"},{"user":"0x04668ec2f57cc15c381b461b9fedab5d451c8f7f","signature":"0x000000000000000000000000000000000000000000000000000000000000001cdb199d09233dc900369c8017332554f3c731eb7519697c44f6b0d73f9545a9f03c64c8ca2f0a1f40a2bb39f2a0941da9909429004f65048d345fe69528cf453c"}]});
         let deserialized_signatures: SignaturesObject =
             serde_json::from_value(request_json.clone()).unwrap();
         orderbook
@@ -357,7 +361,7 @@ pub mod test_util {
                     auction_id: deserialized_signatures.auction_id,
                     chain_id: U256::from(deserialized_signatures.chain_id),
                     allow_list_manager: deserialized_signatures.allow_list_contract,
-                    allow_list_signer: "0x740a98F8f4fAe0986FB3264Fe4aaCf94ac1EE96f"
+                    allow_list_signer: "0xfB696e9E9e5038DDc78592082689B149AB3a19d5"
                         .parse()
                         .unwrap(),
                     ..Default::default()
@@ -369,8 +373,9 @@ pub mod test_util {
             address: "740a98F8f4fAe0986FB3264Fe4aaCf94ac1EE96f".parse().unwrap(),
             user_id: 10_u64,
         };
-        let signature_store_arc = Arc::new(signature_store);
-        let filter = provide_signatures_object(Arc::new(orderbook), signature_store_arc.clone());
+        let db = Database::new("postgresql://").unwrap();
+        db.clear().await.unwrap();
+        let filter = provide_signatures_object(Arc::new(orderbook), db.clone());
         let response = request()
             .path(&"/provide_signature".to_string())
             .method("POST")
@@ -378,13 +383,17 @@ pub mod test_util {
             .reply(&filter)
             .await;
         assert_eq!(response.status(), StatusCode::OK);
-        let signature_from_particular_user = signature_store_arc
-            .get_signature(deserialized_signatures.auction_id, user.address)
+        let signature_from_particular_user = db
+            .get_signatures(&SignatureFilter {
+                auction_id: (deserialized_signatures.auction_id as u32),
+                user_address: Some(user.address),
+            })
+            .try_collect::<Vec<_>>()
             .await
             .unwrap();
         assert_eq!(
             deserialized_signatures.signatures[0].signature,
-            signature_from_particular_user
+            signature_from_particular_user[0]
         );
     }
 }

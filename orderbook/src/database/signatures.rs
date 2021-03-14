@@ -2,6 +2,7 @@ use super::*;
 use anyhow::{anyhow, Context, Result};
 use ethcontract::Address;
 use futures::{stream::TryStreamExt, Stream};
+use model::signature_object::SignaturePackage;
 use model::Signature;
 use primitive_types::H160;
 use std::convert::TryInto;
@@ -34,8 +35,23 @@ impl Database {
             .context("insert_signature failed")
             .map(|_| ())
     }
+    pub async fn insert_signatures(
+        &self,
+        auction_id: u64,
+        users_and_signatures: Vec<SignaturePackage>,
+    ) -> Result<()> {
+        for signature_pair in users_and_signatures {
+            self.insert_signature(
+                auction_id as u32,
+                signature_pair.user,
+                &signature_pair.signature,
+            )
+            .await?;
+        }
+        Ok(())
+    }
 
-    pub fn signatures<'a>(
+    pub fn get_signatures<'a>(
         &'a self,
         filter: &'a SignatureFilter,
     ) -> impl Stream<Item = Result<Signature>> + 'a {
@@ -77,6 +93,9 @@ mod tests {
 
     use super::*;
     use futures::StreamExt;
+    use futures::TryStreamExt;
+    use model::signature_object::SignaturePackage;
+    use model::user::User;
     use std::str::FromStr;
 
     #[tokio::test]
@@ -107,7 +126,7 @@ mod tests {
             auction_id,
             user_address: Some(user_address),
         };
-        assert!(db.signatures(&filter).boxed().next().await.is_none());
+        assert!(db.get_signatures(&filter).boxed().next().await.is_none());
         let value = String::from("0x000000000000000000000000000000000000000000000000000000000000001b772598c8cbf75630449d3edfd4dcddd2eab9e2fc2f854de5f17f58742fa3b55a090a5212d1decfa0c0b43e7466e1b1bb623a3a8ec4ac53adc87b6b905f8676f9");
         let signature = Signature::from_str(&value).unwrap();
 
@@ -115,7 +134,7 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(
-            db.signatures(&filter)
+            db.get_signatures(&filter)
                 .try_collect::<Vec<Signature>>()
                 .await
                 .unwrap(),
@@ -148,11 +167,49 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(
-            db.signatures(&filter)
+            db.get_signatures(&filter)
                 .try_collect::<Vec<Signature>>()
                 .await
                 .unwrap(),
             vec![signature_1, signature_2]
         );
+    }
+    #[tokio::test]
+    #[ignore]
+    async fn test_insert_signatures() {
+        let db = Database::new("postgresql://").unwrap();
+        db.clear().await.unwrap();
+        let auction_id: u64 = 11;
+        let signature = Signature {
+            v: 1,
+            r: "0200000000000000000000000000000000000000000000000000000000000003"
+                .parse()
+                .unwrap(),
+            s: "0400000000000000000000000000000000000000000000000000000000000005"
+                .parse()
+                .unwrap(),
+        };
+        let user = User {
+            address: "740a98F8f4fAe0986FB3264Fe4aaCf94ac1EE96f".parse().unwrap(),
+            user_id: 10_u64,
+        };
+        db.insert_signatures(
+            auction_id,
+            vec![SignaturePackage {
+                user: user.address,
+                signature,
+            }],
+        )
+        .await
+        .unwrap();
+        let received_signature = db
+            .get_signatures(&SignatureFilter {
+                auction_id: (auction_id as u32),
+                user_address: Some(user.address),
+            })
+            .try_collect::<Vec<Signature>>()
+            .await
+            .unwrap();
+        assert_eq!(received_signature[0], signature)
     }
 }

@@ -1,8 +1,8 @@
 use contracts::EasyAuction;
+use orderbook::database::Database;
 use orderbook::event_reader::EventReader;
 use orderbook::orderbook::Orderbook;
 use orderbook::serve_task;
-use orderbook::signatures::SignatureStore;
 use std::num::ParseFloatError;
 use std::sync::Arc;
 use std::{net::SocketAddr, time::Duration};
@@ -21,6 +21,10 @@ struct Arguments {
 
     #[structopt(long, env = "BIND_ADDRESS", default_value = "0.0.0.0:8080")]
     bind_address: SocketAddr,
+
+    /// Url of the Postgres database. By default connects to locally running postgres.
+    #[structopt(long, env = "DB_URL", default_value = "postgresql://")]
+    db_url: Url,
 
     /// The Ethereum node URL to connect to.
     #[structopt(
@@ -131,10 +135,10 @@ async fn main() {
         .await
         .expect("Couldn't load deployed easyAuction");
     let event_reader = EventReader::new(easy_auction_contract, web3);
+    let database = Database::new(args.db_url.as_str()).expect("failed to create database");
     let orderbook_latest = Arc::new(Orderbook::new());
     let orderbook_reorg_save = Arc::new(Orderbook::new());
-    let signature_store = Arc::new(SignatureStore::new());
-    let serve_task = serve_task(orderbook_latest.clone(), signature_store, args.bind_address);
+    let serve_task = serve_task(orderbook_latest.clone(), database, args.bind_address);
     let maintenance_task = task::spawn(orderbook_maintenance(
         orderbook_latest,
         orderbook_reorg_save,
