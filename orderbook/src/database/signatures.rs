@@ -202,7 +202,7 @@ mod tests {
             .await
             .unwrap();
         let hashset_from_result: HashSet<model::Signature> = HashSet::from_iter(result_vec);
-        let hashset_from_vec = HashSet::from_iter(vec![signature_1, signature_2].iter().cloned());
+        let hashset_from_vec = HashSet::from_iter(vec![signature_1, signature_2]);
         assert_eq!(hashset_from_result, hashset_from_vec);
     }
     #[tokio::test]
