@@ -57,8 +57,17 @@ async fn run() -> Result<()> {
             }};
         }
 
-    log::info!("deploying easyAuction contract");
-    deploy!(EasyAuction());
+    log::info!("deploying WETH9 contract");
+    let weth = deploy!(WETH9());
+
+    log::info!("deploying EasyAuction contract");
+    let easy_auction = deploy!(EasyAuction());
+
+    log::info!("deploying AllowListOffChainManaged contract");
+    deploy!(AllowListOffChainManaged());
+
+    log::info!("deploying DepositAndPlaceOrder contract");
+    deploy!(DepositAndPlaceOrder(easy_auction.address(), weth.address()));
 
     touch_build_script()
 }

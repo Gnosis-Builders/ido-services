@@ -23,6 +23,18 @@ const NPM_CONTRACTS: &[(&str, &str)] = &[
         "@gnosis.pm/ido-contracts@0.4.0/deployments/rinkeby/EasyAuction.json",
         "EasyAuction.json",
     ),
+    (
+        "@gnosis.pm/ido-contracts@0.4.0/deployments/rinkeby/AllowListOffChainManaged.json",
+        "AllowListOffChainManaged.json",
+    ),
+    (
+        "@gnosis.pm/ido-contracts@0.4.0/deployments/rinkeby/DepositAndPlaceOrder.json",
+        "DepositAndPlaceOrder.json",
+    ),
+    (
+        "canonical-weth@1.4.0/build/contracts/WETH9.json",
+        "WETH9.json",
+    ),
 ];
 
 fn main() {

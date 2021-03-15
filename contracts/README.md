@@ -32,3 +32,4 @@ A `[[bin]]` script for vendoring smart contract json artifacts that ethcontract 
 - Run the vendor binary for example with `(cd contracts; cargo run --bin vendor --features bin)`. This creates a new json file for this contract in the `artifacts` folder.
 - In `build.rs` add a `generate_contract` call for the contract. This creates the ethcontract generated rust code file.
 - In `lib.rs` add an `include!` call for the contract. This imports the rust code into the library.
+- In `bin/deploy.rs` add a `deploy!` call for the contract. In this way, the new contract will be deployed with this script.
