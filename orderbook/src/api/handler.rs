@@ -119,14 +119,16 @@ pub async fn provide_signatures(
             ));
         }
     }
-    if let Err(err) = db
+    let insert_results = db
         .insert_signatures(signature_object.auction_id, signature_object.signatures)
-        .await
-    {
+        .await;
+    let errors: Vec<&std::result::Result<(), anyhow::Error>> =
+        insert_results.iter().filter(|res| res.is_err()).collect();
+    if !errors.is_empty() {
         return Ok(with_status(
             json(&format!(
-                "Error {:?} while inserting data into database ",
-                err
+                "Errors: {:?} while inserting data into database ",
+                errors
             )),
             StatusCode::BAD_REQUEST,
         ));

@@ -307,7 +307,7 @@ pub mod test_util {
     #[tokio::test]
     #[ignore]
     async fn get_signature_() {
-        let auction_id: u64 = 1;
+        let auction_id: u64 = 15;
         let signature = Signature {
             v: 1,
             r: "0200000000000000000000000000000000000000000000000000000000000003"
@@ -323,15 +323,18 @@ pub mod test_util {
         };
         let db = Database::new("postgresql://").unwrap();
         db.clear().await.unwrap();
-        db.insert_signatures(
-            auction_id,
-            vec![SignaturePackage {
-                user: user.address,
-                signature,
-            }],
-        )
-        .await
-        .unwrap();
+        let results = db
+            .insert_signatures(
+                auction_id,
+                vec![SignaturePackage {
+                    user: user.address,
+                    signature,
+                }],
+            )
+            .await;
+        let errors: Vec<&std::result::Result<(), anyhow::Error>> =
+            results.iter().filter(|obj| obj.is_err()).collect();
+        assert!(errors.is_empty());
         let filter = get_signature(db);
         let response = request()
             .path(&format!(

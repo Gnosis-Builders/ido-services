@@ -1,6 +1,7 @@
 use super::*;
 use anyhow::{anyhow, Context, Result};
 use ethcontract::Address;
+use futures::future::join_all;
 use futures::{stream::TryStreamExt, Stream};
 use model::signature_object::SignaturePackage;
 use model::Signature;
@@ -19,36 +20,52 @@ impl Database {
         &self,
         auction_id: u32,
         user_address: Address,
-        signature: &Signature,
+        signature: Signature,
     ) -> Result<()> {
         const QUERY: &str = "\
             INSERT INTO signatures (
                 auction_id, user_address, signature) \
             VALUES ( \
                 $1, $2, $3);";
-        sqlx::query(QUERY)
+        let result = sqlx::query(QUERY)
             .bind(auction_id)
             .bind(user_address.as_bytes())
             .bind(signature.to_bytes().as_ref())
             .execute(&self.pool)
-            .await
-            .context("insert_signature failed")
-            .map(|_| ())
+            .await;
+        match result {
+            Ok(_) => {
+                return Ok(());
+            }
+            Err(error) => match error {
+                sqlx::Error::Database(err) => {
+                    // duplicate key errors are okay, as this means that the signature was already provided before
+                    // as signatures are unique, the correct value was already existent
+                    if err.message().contains("duplicate key") {
+                        return Ok(());
+                    }
+                    return Err(sqlx::Error::Database(err)).context("insert_signature failed");
+                }
+                other_error => {
+                    return Err(other_error).context("insert_signature failed");
+                }
+            },
+        };
     }
     pub async fn insert_signatures(
         &self,
         auction_id: u64,
         users_and_signatures: Vec<SignaturePackage>,
-    ) -> Result<()> {
+    ) -> Vec<std::result::Result<(), anyhow::Error>> {
+        let mut futures = Vec::new();
         for signature_pair in users_and_signatures {
-            self.insert_signature(
+            futures.push(self.insert_signature(
                 auction_id as u32,
                 signature_pair.user,
-                &signature_pair.signature,
-            )
-            .await?;
+                signature_pair.signature,
+            ));
         }
-        Ok(())
+        join_all(futures).await
     }
 
     pub fn get_signatures<'a>(
@@ -96,23 +113,36 @@ mod tests {
     use futures::TryStreamExt;
     use model::signature_object::SignaturePackage;
     use model::user::User;
+    use std::collections::HashSet;
+    use std::iter::FromIterator;
     use std::str::FromStr;
 
     #[tokio::test]
     #[ignore]
-    async fn postgres_insert_same_signature_twice_fails() {
+    async fn postgres_insert_same_signature_does_not_fail_and_does_not_generate_duplicate() {
         let db = Database::new("postgresql://").unwrap();
         db.clear().await.unwrap();
-        let auction_id = 1u64;
+        let auction_id = 1u32;
         let user_address = H160::zero();
         let signature = Signature::default();
-        db.insert_signature(auction_id as u32, user_address, &signature)
+        db.insert_signature(auction_id, user_address, signature)
             .await
             .unwrap();
         assert!(db
-            .insert_signature(auction_id as u32, user_address, &signature)
+            .insert_signature(auction_id, user_address, signature)
             .await
-            .is_err());
+            .is_ok());
+        let filter = SignatureFilter {
+            auction_id,
+            user_address: Some(user_address),
+        };
+        assert_eq!(
+            db.get_signatures(&filter)
+                .try_collect::<Vec<Signature>>()
+                .await
+                .unwrap(),
+            vec![signature]
+        );
     }
 
     #[tokio::test]
@@ -130,7 +160,7 @@ mod tests {
         let value = String::from("0x000000000000000000000000000000000000000000000000000000000000001b772598c8cbf75630449d3edfd4dcddd2eab9e2fc2f854de5f17f58742fa3b55a090a5212d1decfa0c0b43e7466e1b1bb623a3a8ec4ac53adc87b6b905f8676f9");
         let signature = Signature::from_str(&value).unwrap();
 
-        db.insert_signature(auction_id as u32, user_address, &signature)
+        db.insert_signature(auction_id as u32, user_address, signature)
             .await
             .unwrap();
         assert_eq!(
@@ -160,19 +190,20 @@ mod tests {
         let value = String::from("0x000000000000000000000000000000000000000000000000000000000000001b172598c8cbf75630449d3edfd4dcddd2eab9e2fc2f854de5f17f58742fa3b55a090a5212d1decfa0c0b43e7466e1b1bb623a3a8ec4ac53adc87b6b905f8676f9");
         let signature_2 = Signature::from_str(&value).unwrap();
 
-        db.insert_signature(auction_id as u32, user_address, &signature_1)
+        db.insert_signature(auction_id as u32, user_address, signature_1)
             .await
             .unwrap();
-        db.insert_signature(auction_id as u32, user_address_2, &signature_2)
+        db.insert_signature(auction_id as u32, user_address_2, signature_2)
             .await
             .unwrap();
-        assert_eq!(
-            db.get_signatures(&filter)
-                .try_collect::<Vec<Signature>>()
-                .await
-                .unwrap(),
-            vec![signature_1, signature_2]
-        );
+        let result_vec: Vec<Signature> = db
+            .get_signatures(&filter)
+            .try_collect::<Vec<Signature>>()
+            .await
+            .unwrap();
+        let hashset_from_result: HashSet<model::Signature> = HashSet::from_iter(result_vec);
+        let hashset_from_vec = HashSet::from_iter(vec![signature_1, signature_2].iter().cloned());
+        assert_eq!(hashset_from_result, hashset_from_vec);
     }
     #[tokio::test]
     #[ignore]
@@ -193,15 +224,18 @@ mod tests {
             address: "740a98F8f4fAe0986FB3264Fe4aaCf94ac1EE96f".parse().unwrap(),
             user_id: 10_u64,
         };
-        db.insert_signatures(
-            auction_id,
-            vec![SignaturePackage {
-                user: user.address,
-                signature,
-            }],
-        )
-        .await
-        .unwrap();
+        let results = db
+            .insert_signatures(
+                auction_id,
+                vec![SignaturePackage {
+                    user: user.address,
+                    signature,
+                }],
+            )
+            .await;
+        let errors: Vec<&std::result::Result<(), anyhow::Error>> =
+            results.iter().filter(|obj| obj.is_err()).collect();
+        assert!(errors.is_empty());
         let received_signature = db
             .get_signatures(&SignatureFilter {
                 auction_id: (auction_id as u32),
@@ -211,5 +245,49 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(received_signature[0], signature)
+    }
+    #[tokio::test]
+    #[ignore]
+    async fn test_duplicate_err_() {
+        let db = Database::new("postgresql://").unwrap();
+        db.clear().await.unwrap();
+        let auction_id: u64 = 11;
+        let signature = Signature {
+            v: 1,
+            r: "0200000000000000000000000000000000000000000000000000000000000003"
+                .parse()
+                .unwrap(),
+            s: "0400000000000000000000000000000000000000000000000000000000000005"
+                .parse()
+                .unwrap(),
+        };
+        let user = User {
+            address: "740a98F8f4fAe0986FB3264Fe4aaCf94ac1EE96f".parse().unwrap(),
+            user_id: 10_u64,
+        };
+        let results = db
+            .insert_signatures(
+                auction_id,
+                vec![SignaturePackage {
+                    user: user.address,
+                    signature,
+                }],
+            )
+            .await;
+        let errors: Vec<&std::result::Result<(), anyhow::Error>> =
+            results.iter().filter(|obj| obj.is_err()).collect();
+        assert!(errors.is_empty());
+        let results = db
+            .insert_signatures(
+                auction_id,
+                vec![SignaturePackage {
+                    user: user.address,
+                    signature,
+                }],
+            )
+            .await;
+        let errors: Vec<&std::result::Result<(), anyhow::Error>> =
+            results.iter().filter(|obj| obj.is_err()).collect();
+        assert!(errors.is_empty());
     }
 }
