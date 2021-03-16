@@ -21,9 +21,8 @@ The tests that require postgres connect to the default database of locally runni
 
 ```sh
 # Docker
-docker run -e POSTGRES_PASSWORD=password -e POSTGRES_USER=`whoami` -p 5432:5432 postgres
+docker run -e POSTGRES_PASSWORD=password -e POSTGRES_USER=$USER -p 5432:5432 postgres
 
-where whoami is the result from the terminal command `whoami`
 # Service
 sudo systemctl start postgresql.service
 sudo -u postgres createuser $USER
