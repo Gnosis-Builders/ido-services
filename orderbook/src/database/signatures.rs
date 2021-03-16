@@ -40,7 +40,8 @@ impl Database {
             Err(error) => match error {
                 sqlx::Error::Database(err) => {
                     // duplicate key errors are okay, as this means that the signature was already provided before
-                    // as signatures are unique, the correct value was already existent
+                    // All signatures are validated before insertion into the database and their validity doesn't
+                    // change with time. Storing a second valid signature is not necessary.
                     if err.message().contains("duplicate key") {
                         return Ok(());
                     }
