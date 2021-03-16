@@ -8,10 +8,10 @@ use model::Signature;
 use primitive_types::H160;
 use std::convert::TryInto;
 
-/// Any default value means that this field is unfiltered.
 #[derive(Default)]
 pub struct SignatureFilter {
     pub auction_id: u32,
+    /// `None` means that this field is unfiltered.
     pub user_address: Option<H160>,
 }
 
