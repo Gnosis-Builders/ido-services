@@ -1,18 +1,17 @@
 mod filter;
 mod handler;
 
+use crate::database::Database;
 use crate::orderbook::Orderbook;
-use crate::signatures::SignatureStore;
 use std::sync::Arc;
 use warp::Filter;
 
 pub fn handle_all_routes(
     orderbook: Arc<Orderbook>,
-    signatures: Arc<SignatureStore>,
+    database: Database,
 ) -> impl Filter<Extract = (impl warp::Reply,), Error = warp::Rejection> + Clone {
-    let get_signature = filter::get_signature(signatures.clone());
-    let provide_signatures_object =
-        filter::provide_signatures_object(orderbook.clone(), signatures);
+    let get_signature = filter::get_signature(database.clone());
+    let provide_signatures_object = filter::provide_signatures_object(orderbook.clone(), database);
     let get_previous_order = filter::get_previous_order(orderbook.clone());
     let get_order_book_display_data = filter::get_order_book_display_data(orderbook.clone());
     let get_user_orders = filter::get_user_orders(orderbook.clone());

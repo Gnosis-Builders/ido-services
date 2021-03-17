@@ -1,9 +1,9 @@
 use contracts::{ERC20Mintable, EasyAuction};
 use ethcontract::prelude::{Account, Address, BlockNumber, Http, Web3, U256};
 use model::order::PricePoint;
+use orderbook::database::Database;
 use orderbook::event_reader::EventReader;
 use orderbook::orderbook::{Orderbook, QUEUE_START};
-use orderbook::signatures::SignatureStore;
 use serde_json::Value;
 use std::{str::FromStr, sync::Arc};
 
@@ -112,10 +112,11 @@ async fn test_with_ganache() {
 
     // serve task
     let orderbook = Arc::new(Orderbook::new());
-    let signature_store = Arc::new(SignatureStore::new());
+    let database = Database::new(&"postgresql://").expect("failed to create database");
+    database.clear().await.unwrap();
     orderbook::serve_task(
         orderbook.clone(),
-        signature_store,
+        database,
         API_HOST[7..].parse().expect("Couldn't parse API address"),
     );
     let event_reader = EventReader::new(easy_auction, web3);

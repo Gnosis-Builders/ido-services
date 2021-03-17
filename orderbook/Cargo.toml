@@ -19,6 +19,7 @@ structopt = { version = "0.3", default-features = false }
 url = "2.2"
 ethcontract = "0.11.1"
 web3 = { version = "0.15", default-features = false, features = ["http-tls"] }
+sqlx = { version = "0.4", default-features = false, features = ["bigdecimal", "chrono", "macros", "runtime-tokio-native-tls", "postgres"] }
 futures = "0.3.8"
 lazy_static = "1.4"
 warp = "0.2"
