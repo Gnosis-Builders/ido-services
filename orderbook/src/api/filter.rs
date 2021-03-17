@@ -332,8 +332,7 @@ pub mod test_util {
                 }],
             )
             .await;
-        let errors: Vec<&std::result::Result<(), anyhow::Error>> =
-            results.iter().filter(|obj| obj.is_err()).collect();
+        let errors: Vec<anyhow::Error> = results.into_iter().filter_map(|res| res.err()).collect();
         assert!(errors.is_empty());
         let filter = get_signature(db);
         let response = request()

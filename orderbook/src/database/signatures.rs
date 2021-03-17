@@ -234,8 +234,7 @@ mod tests {
                 }],
             )
             .await;
-        let errors: Vec<&std::result::Result<(), anyhow::Error>> =
-            results.iter().filter(|obj| obj.is_err()).collect();
+        let errors: Vec<anyhow::Error> = results.into_iter().filter_map(|res| res.err()).collect();
         assert!(errors.is_empty());
         let received_signature = db
             .get_signatures(&SignatureFilter {
@@ -275,8 +274,7 @@ mod tests {
                 }],
             )
             .await;
-        let errors: Vec<&std::result::Result<(), anyhow::Error>> =
-            results.iter().filter(|obj| obj.is_err()).collect();
+        let errors: Vec<anyhow::Error> = results.into_iter().filter_map(|res| res.err()).collect();
         assert!(errors.is_empty());
         let results = db
             .insert_signatures(
@@ -287,8 +285,7 @@ mod tests {
                 }],
             )
             .await;
-        let errors: Vec<&std::result::Result<(), anyhow::Error>> =
-            results.iter().filter(|obj| obj.is_err()).collect();
+        let errors: Vec<anyhow::Error> = results.into_iter().filter_map(|res| res.err()).collect();
         assert!(errors.is_empty());
     }
 }

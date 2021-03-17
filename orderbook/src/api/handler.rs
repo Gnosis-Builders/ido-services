@@ -122,8 +122,10 @@ pub async fn provide_signatures(
     let insert_results = db
         .insert_signatures(signature_object.auction_id, signature_object.signatures)
         .await;
-    let errors: Vec<&std::result::Result<(), anyhow::Error>> =
-        insert_results.iter().filter(|res| res.is_err()).collect();
+    let errors: Vec<anyhow::Error> = insert_results
+        .into_iter()
+        .filter_map(|res| res.err())
+        .collect();
     if !errors.is_empty() {
         return Ok(with_status(
             json(&format!(
