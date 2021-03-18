@@ -100,7 +100,7 @@ impl EventReader {
                 U256::from(auctioning_erc20_contract.decimals().call().await?);
             let symbol_bidding_token = bidding_erc20_contract.symbol().call().await?;
             let decimals_bidding_token =
-                U256::from(auctioning_erc20_contract.decimals().call().await?);
+                U256::from(bidding_erc20_contract.decimals().call().await?);
             let price_point = order
                 .to_price_point(decimals_bidding_token, decimals_auctioning_token)
                 .invert_price();
