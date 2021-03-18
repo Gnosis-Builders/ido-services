@@ -199,7 +199,7 @@ impl Orderbook {
             })
             .map(|order| {
                 order
-                    .to_price_point(decimals_auctioning_token, decimals_bidding_token)
+                    .to_price_point(decimals_bidding_token, decimals_auctioning_token)
                     // << invert price for unified representation of different orders.
                     .invert_price()
             })
