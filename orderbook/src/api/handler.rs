@@ -41,7 +41,7 @@ pub async fn get_signature(
         if signature.len() != 1 {
             return Ok(with_status(
                 json(&format!("Signature not available for user {:}", user.0)),
-                StatusCode::BAD_REQUEST,
+                StatusCode::OK,
             ));
         }
         Ok(with_status(json(&signature[0]), StatusCode::OK))
