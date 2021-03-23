@@ -1,4 +1,5 @@
 use contracts::EasyAuction;
+use ethcontract::H160;
 use orderbook::database::Database;
 use orderbook::event_reader::EventReader;
 use orderbook::orderbook::Orderbook;
@@ -67,6 +68,7 @@ pub async fn orderbook_maintenance(
         {
             let mut orderbook = orderbook_latest.orders.write().await;
             let orderbook_reorg_save = orderbook_reorg_protected.orders.read().await;
+            orderbook.retain(|&k, _| k == 0);
             for auction_id in orderbook_reorg_save.keys() {
                 orderbook.insert(
                     *auction_id,
@@ -78,6 +80,7 @@ pub async fn orderbook_maintenance(
                 .orders_without_claimed
                 .read()
                 .await;
+            orderbook.retain(|&k, _| k == 0);
             for auction_id in orderbook_reorg_save.keys() {
                 orderbook.insert(
                     *auction_id,
@@ -86,6 +89,7 @@ pub async fn orderbook_maintenance(
             }
             let mut orderbook = orderbook_latest.auction_details.write().await;
             let orderbook_reorg_save = orderbook_reorg_protected.auction_details.read().await;
+            orderbook.retain(|&k, _| k == 0);
             for auction_id in orderbook_reorg_save.keys() {
                 orderbook.insert(
                     *auction_id,
@@ -94,12 +98,14 @@ pub async fn orderbook_maintenance(
             }
             let mut users = orderbook_latest.users.write().await;
             let users_reorg_save = orderbook_reorg_protected.users.read().await;
+            users.retain(|&k, _| k == H160::zero());
             for address in users_reorg_save.keys() {
                 users.insert(*address, *users_reorg_save.get(address).unwrap());
             }
             let mut auction_participation = orderbook_latest.auction_participation.write().await;
             let auction_participation_reorg_save =
                 orderbook_reorg_protected.auction_participation.read().await;
+            auction_participation.retain(|&k, _| k == 0);
             for user_ids in auction_participation_reorg_save.keys() {
                 auction_participation.insert(
                     *user_ids,
