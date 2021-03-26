@@ -121,6 +121,15 @@ impl Orderbook {
             Entry::Vacant(_) => {}
         }
     }
+    pub async fn sort_orders_without_claimed(&self, auction_id: u64) {
+        let mut hashmap = self.orders_without_claimed.write().await;
+        match hashmap.entry(auction_id) {
+            Entry::Occupied(order_vec) => {
+                order_vec.into_mut().sort();
+            }
+            Entry::Vacant(_) => {}
+        }
+    }
     pub async fn remove_orders(&self, auction_id: u64, orders: Vec<Order>) {
         if orders.is_empty() {
             return;
@@ -436,6 +445,7 @@ impl Orderbook {
             )
             .await;
             self.sort_orders(auction_id).await;
+            self.sort_orders_without_claimed(auction_id).await;
             self.update_clearing_price_info(auction_id).await?;
         }
         *last_block_considered = to_block;
