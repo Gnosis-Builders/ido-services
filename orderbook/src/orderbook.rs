@@ -342,7 +342,7 @@ impl Orderbook {
         let order_vec = order_hashmap.get(&auction_id).unwrap_or(&empty_order_vec);
         let mut smaller_order: Order = *QUEUE_START;
         for order_from_vec in order_vec {
-            if order_from_vec < &order {
+            if order_from_vec < &order && order_from_vec > &smaller_order {
                 smaller_order = *order_from_vec;
             }
         }
