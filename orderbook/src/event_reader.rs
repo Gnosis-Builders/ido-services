@@ -31,6 +31,7 @@ pub struct DataFromEvent {
 }
 
 const BLOCK_CONFIRMATION_COUNT: u64 = 10;
+const NUMBER_OF_BLOCKS_TO_SYNC_PER_REQUEST: u64 = 10000;
 
 impl EventReader {
     pub fn new(contract: EasyAuction, web3: Web3<web3::transports::Http>) -> Self {
@@ -231,6 +232,9 @@ impl EventReader {
         let from_block = last_handled_block + 1;
         if from_block > to_block {
             anyhow::bail!("Benign Error: from_block > to_block for updating events")
+        }
+        if from_block + NUMBER_OF_BLOCKS_TO_SYNC_PER_REQUEST < to_block {
+            to_block = std::cmp::min(to_block, from_block + NUMBER_OF_BLOCKS_TO_SYNC_PER_REQUEST);
         }
         info!(
             "Updating event based orderbook from block {} to block {} ",

@@ -1,11 +1,17 @@
 use contracts::EasyAuction;
-use ethcontract::H160;
+use ethcontract::{Address, H160};
+use lazy_static::lazy_static;
+use maplit::hashmap;
 use orderbook::database::Database;
 use orderbook::event_reader::EventReader;
+use orderbook::health::HealthReporting;
+use orderbook::health::HttpHealthEndpoint;
 use orderbook::orderbook::Orderbook;
 use orderbook::serve_task;
+use primitive_types::H256;
 use std::num::ParseFloatError;
 use std::sync::Arc;
+use std::{collections::HashMap, str::FromStr};
 use std::{net::SocketAddr, time::Duration};
 use structopt::StructOpt;
 use tokio::task;
@@ -46,13 +52,44 @@ struct Arguments {
 }
 
 const MAINTENANCE_INTERVAL: Duration = Duration::from_secs(3);
+// Todo: duplication from build file.
+lazy_static! {
+    static ref EASY_AUCTION_DEPLOYMENT_INFO: HashMap::<u32, (Address, Option<H256>)> = hashmap! {
+    4 => (Address::from_str("307C1384EFeF241d6CBBFb1F85a04C54307Ac9F6").unwrap(), Some("0xecf8358d08dfdbd9549c0affa2226b062fe78867f156a258bd9da1e05ad842aa".parse().unwrap())),
+    100 => (Address::from_str("9BacE46438b3f3e0c06d67f5C1743826EE8e87DA").unwrap(), Some("0x7304d6dfe40a8b5a97c6579743733139dd50c3b4a7d39181fd7c24ac28c3986f".parse().unwrap())),
+    };
+}
 
 pub async fn orderbook_maintenance(
     orderbook_latest: Arc<Orderbook>,
     orderbook_reorg_protected: Arc<Orderbook>,
     event_reader: EventReader,
+    health: Arc<HttpHealthEndpoint>,
 ) -> ! {
+    // First block considered for synchronization should be the one, in which the deployment
+    // of Gnosis Auction contract happens
+    let chain_id = event_reader.web3.eth().chain_id().await.unwrap();
+    let tx_info = event_reader
+        .web3
+        .eth()
+        .transaction(
+            EASY_AUCTION_DEPLOYMENT_INFO
+                .clone()
+                .get(&chain_id.as_u32())
+                .unwrap_or(&(Address::zero(), None))
+                .1
+                .unwrap()
+                .into(),
+        )
+        .await
+        .unwrap();
     let mut last_block_considered_for_reorg_protected_orderbook = 0u64;
+    match tx_info {
+        Some(tx) => {
+            last_block_considered_for_reorg_protected_orderbook = tx.block_number.unwrap().as_u64()
+        }
+        None => tracing::error!("Deployment block was not found"),
+    }
 
     loop {
         tracing::debug!("running order book maintenance with reorg protection");
@@ -116,16 +153,23 @@ pub async fn orderbook_maintenance(
                 );
             }
         }
+        let mut last_block_considered = last_block_considered_for_reorg_protected_orderbook; // Values are cloned, as we don't wanna store the values.
         orderbook_latest
-            .run_maintenance(
-                &event_reader,
-                &mut last_block_considered_for_reorg_protected_orderbook.clone(), // Values are cloned, as we don't wanna store the values.
-                false,
-            )
+            .run_maintenance(&event_reader, &mut last_block_considered, false)
             .await
             .expect("maintenance function not successful");
 
+        let current_block = event_reader
+            .web3
+            .eth()
+            .block_number()
+            .await
+            .unwrap_or_else(|_| web3::types::U64::zero())
+            .as_u64();
         tokio::time::delay_for(MAINTENANCE_INTERVAL).await;
+        if current_block == last_block_considered {
+            health.notify_ready();
+        }
     }
 }
 
@@ -133,7 +177,7 @@ pub async fn orderbook_maintenance(
 async fn main() {
     let args = Arguments::from_args();
     tracing_setup::initialize(args.log_filter.as_str());
-    tracing::info!("running order book with {:#?}", args);
+    tracing::debug!("running order book with {:#?}", args);
     let transport =
         web3::transports::Http::new(args.node_url.as_str()).expect("transport creation failed");
     let web3 = web3::Web3::new(transport);
@@ -144,11 +188,18 @@ async fn main() {
     let database = Database::new(args.db_url.as_str()).expect("failed to create database");
     let orderbook_latest = Arc::new(Orderbook::new());
     let orderbook_reorg_save = Arc::new(Orderbook::new());
-    let serve_task = serve_task(orderbook_latest.clone(), database, args.bind_address);
+    let health = Arc::new(HttpHealthEndpoint::new());
+    let serve_task = serve_task(
+        orderbook_latest.clone(),
+        database,
+        health.clone(),
+        args.bind_address,
+    );
     let maintenance_task = task::spawn(orderbook_maintenance(
         orderbook_latest,
         orderbook_reorg_save,
         event_reader,
+        health,
     ));
     tokio::select! {
         result = serve_task => tracing::error!(?result, "serve task exited"),

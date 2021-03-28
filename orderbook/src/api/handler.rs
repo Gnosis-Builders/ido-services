@@ -1,6 +1,7 @@
 use crate::api::filter::H160Wrapper;
 use crate::database::Database;
 use crate::database::SignatureFilter;
+use crate::health::HttpHealthEndpoint;
 use crate::orderbook::Orderbook;
 use futures::TryStreamExt;
 use model::auction_details::AuctionDetails;
@@ -23,6 +24,17 @@ pub fn extract_signatures_object_from_json(
 ) -> impl Filter<Extract = (SignaturesObject,), Error = Rejection> + Clone {
     // (rejecting huge payloads)...
     warp::body::content_length_limit(MAX_JSON_BODY_PAYLOAD).and(warp::body::json())
+}
+
+pub async fn readiness(health: Arc<HttpHealthEndpoint>) -> Result<impl warp::Reply, Infallible> {
+    if health.is_ready() {
+        Ok(with_status(json(&""), StatusCode::NO_CONTENT))
+    } else {
+        Ok(with_status(
+            json(&"service unavailable"),
+            StatusCode::SERVICE_UNAVAILABLE,
+        ))
+    }
 }
 
 pub async fn get_signature(

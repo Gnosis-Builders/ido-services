@@ -1,6 +1,7 @@
 use super::handler;
 use crate::api::handler::extract_signatures_object_from_json;
 use crate::database::Database;
+use crate::health::HttpHealthEndpoint;
 use crate::orderbook::Orderbook;
 use hex::{FromHex, FromHexError};
 use model::order::Order;
@@ -12,6 +13,12 @@ fn with_orderbook(
     orderbook: Arc<Orderbook>,
 ) -> impl Filter<Extract = (Arc<Orderbook>,), Error = std::convert::Infallible> + Clone {
     warp::any().map(move || orderbook.clone())
+}
+
+fn with_health(
+    health: Arc<HttpHealthEndpoint>,
+) -> impl Filter<Extract = (Arc<HttpHealthEndpoint>,), Error = std::convert::Infallible> + Clone {
+    warp::any().map(move || health.clone())
 }
 
 fn with_signatures(
@@ -37,6 +44,15 @@ pub fn get_previous_order(
         .and(warp::get())
         .and(with_orderbook(orderbook))
         .and_then(handler::get_previous_order)
+}
+
+pub fn health_filter_readiness(
+    health: Arc<HttpHealthEndpoint>,
+) -> impl Filter<Extract = (impl warp::Reply,), Error = warp::Rejection> + Clone {
+    warp::path!("readiness")
+        .and(warp::get())
+        .and(with_health(health))
+        .and_then(handler::readiness)
 }
 
 pub fn get_user_orders(

@@ -3,6 +3,7 @@ use ethcontract::prelude::{Account, Address, BlockNumber, Http, Web3, U256};
 use model::order::PricePoint;
 use orderbook::database::Database;
 use orderbook::event_reader::EventReader;
+use orderbook::health::HttpHealthEndpoint;
 use orderbook::orderbook::{Orderbook, QUEUE_START};
 use serde_json::Value;
 use std::{str::FromStr, sync::Arc};
@@ -114,9 +115,11 @@ async fn test_with_ganache() {
     let orderbook = Arc::new(Orderbook::new());
     let database = Database::new(&"postgresql://").expect("failed to create database");
     database.clear().await.unwrap();
+    let health = Arc::new(HttpHealthEndpoint::new());
     orderbook::serve_task(
         orderbook.clone(),
         database,
+        health,
         API_HOST[7..].parse().expect("Couldn't parse API address"),
     );
     let event_reader = EventReader::new(easy_auction, web3);

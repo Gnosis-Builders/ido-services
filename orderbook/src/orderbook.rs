@@ -225,7 +225,6 @@ impl Orderbook {
         let hashmap = self.auction_participation.read().await;
         let empty_set = HashSet::new();
         let result = hashmap.get(&user_id).unwrap_or(&empty_set).clone();
-        println!("{:?}", result);
         result
     }
     pub async fn get_user_id(&self, user: H160) -> Result<u64> {
@@ -378,7 +377,7 @@ impl Orderbook {
                 to_block = return_data.1
             }
             Err(err) => {
-                tracing::info!("get_to_block was not successful with error: {:}", err);
+                tracing::debug!("get_to_block was not successful with error: {:}", err);
                 return Ok(());
             }
         }
@@ -446,7 +445,9 @@ impl Orderbook {
             .await;
             self.sort_orders(auction_id).await;
             self.sort_orders_without_claimed(auction_id).await;
-            self.update_clearing_price_info(auction_id).await?;
+            if let Err(err) = self.update_clearing_price_info(auction_id).await {
+                tracing::debug!("error while calculating the clearing price: {:}", err)
+            };
         }
         *last_block_considered = to_block;
         Ok(())

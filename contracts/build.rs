@@ -1,9 +1,19 @@
 use ethcontract_generate::{Address, Builder, TransactionHash};
+use lazy_static::lazy_static;
 use maplit::hashmap;
+use primitive_types::H256;
 use std::{collections::HashMap, env, fs, path::Path, str::FromStr};
 
 #[path = "src/paths.rs"]
 mod paths;
+
+// Todo: duplication from orderbook/main file.
+lazy_static! {
+    pub static ref EASY_AUCTION_DEPLOYMENT_INFO: HashMap::<u32, (Address, Option<H256>)> = hashmap! {
+    4 => (Address::from_str("307C1384EFeF241d6CBBFb1F85a04C54307Ac9F6").unwrap(), Some("0xecf8358d08dfdbd9549c0affa2226b062fe78867f156a258bd9da1e05ad842aa".parse().unwrap())),
+    100 => (Address::from_str("9BacE46438b3f3e0c06d67f5C1743826EE8e87DA").unwrap(), Some("0x7304d6dfe40a8b5a97c6579743733139dd50c3b4a7d39181fd7c24ac28c3986f".parse().unwrap())),
+    };
+}
 
 fn main() {
     // NOTE: This is a workaround for `rerun-if-changed` directives for
@@ -17,13 +27,7 @@ fn main() {
 
     generate_contract("ERC20", hashmap! {});
     generate_contract("ERC20Mintable", hashmap! {});
-    generate_contract(
-        "EasyAuction",
-        hashmap! {
-            4 => (Address::from_str("307C1384EFeF241d6CBBFb1F85a04C54307Ac9F6").unwrap(), Some("0xecf8358d08dfdbd9549c0affa2226b062fe78867f156a258bd9da1e05ad842aa".parse().unwrap())),
-            100 => (Address::from_str("9BacE46438b3f3e0c06d67f5C1743826EE8e87DA").unwrap(), Some("0x7304d6dfe40a8b5a97c6579743733139dd50c3b4a7d39181fd7c24ac28c3986f".parse().unwrap())),
-        },
-    );
+    generate_contract("EasyAuction", EASY_AUCTION_DEPLOYMENT_INFO.clone());
     generate_contract(
         "AllowListOffChainManaged",
         hashmap! {
