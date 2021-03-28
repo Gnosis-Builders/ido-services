@@ -308,7 +308,9 @@ impl Orderbook {
                 (current_order, sell_amount_clearing_order)
             } else {
                 let clearing_order = Order {
-                    sell_amount: current_bid_sum,
+                    sell_amount: current_bid_sum
+                        .checked_sub(current_order.sell_amount)
+                        .unwrap(),
                     buy_amount: initial_order.sell_amount,
                     user_id: 0_u64,
                 };
