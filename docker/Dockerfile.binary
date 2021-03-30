@@ -11,6 +11,7 @@ FROM alpine:latest
 # Handle signal handlers properly
 RUN apk add --no-cache tini
 COPY --from=cargo-build /usr/src/ido-services/target/x86_64-unknown-linux-musl/release/orderbook /usr/local/bin/orderbook
+COPY docker/startup.sh /usr/local/bin/startup.sh
 
 CMD echo "Specify binary - either solver or orderbook"
-ENTRYPOINT ["/sbin/tini", "--"]
+ENTRYPOINT ["/sbin/tini", "--", "startup.sh"]
