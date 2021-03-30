@@ -231,7 +231,7 @@ impl EventReader {
         }
         let from_block = last_handled_block + 1;
         if from_block > to_block {
-            anyhow::bail!("Benign Error: from_block > to_block for updating events")
+            anyhow::bail!("Benign interruption: from_block > to_block for updating events")
         }
         if from_block + NUMBER_OF_BLOCKS_TO_SYNC_PER_REQUEST < to_block {
             to_block = std::cmp::min(to_block, from_block + NUMBER_OF_BLOCKS_TO_SYNC_PER_REQUEST);

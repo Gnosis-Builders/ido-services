@@ -379,7 +379,10 @@ impl Orderbook {
                 to_block = return_data.1
             }
             Err(err) => {
-                tracing::debug!("get_to_block was not successful with error: {:}", err);
+                tracing::debug!(
+                    "get_to_block was not successful with interruption: {:}",
+                    err
+                );
                 return Ok(());
             }
         }
