@@ -10,8 +10,9 @@ mod paths;
 // Todo: duplication from orderbook/main file.
 lazy_static! {
     pub static ref EASY_AUCTION_DEPLOYMENT_INFO: HashMap::<u32, (Address, Option<H256>)> = hashmap! {
-    4 => (Address::from_str("307C1384EFeF241d6CBBFb1F85a04C54307Ac9F6").unwrap(), Some("0xecf8358d08dfdbd9549c0affa2226b062fe78867f156a258bd9da1e05ad842aa".parse().unwrap())),
-    100 => (Address::from_str("9BacE46438b3f3e0c06d67f5C1743826EE8e87DA").unwrap(), Some("0x7304d6dfe40a8b5a97c6579743733139dd50c3b4a7d39181fd7c24ac28c3986f".parse().unwrap())),
+    1 => (Address::from_str("0b7fFc1f4AD541A4Ed16b40D8c37f0929158D101").unwrap(), Some("0xa7ad659a9762720bd86a30b49a3e139928cc2a27d0863ab78110e19d2bef8a51".parse().unwrap())),
+    4 => (Address::from_str("C5992c0e0A3267C7F75493D0F717201E26BE35f7").unwrap(), Some("0xbdd1dde815a908d407ec89fa9bc317d9e33621ccc6452ac0eb00fe2ed0d81ff4".parse().unwrap())),
+    100 => (Address::from_str("0b7fFc1f4AD541A4Ed16b40D8c37f0929158D101").unwrap(), Some("0x5af5443ba9add113a42b0219ac8f398c383dc5a3684a221fd24c5655b8316931".parse().unwrap())),
     };
 }
 
@@ -31,15 +32,17 @@ fn main() {
     generate_contract(
         "AllowListOffChainManaged",
         hashmap! {
-            4 => (Address::from_str("80b8AcA4689EC911F048c4E0976892cCDE14031E").unwrap(), Some("0x42930a3432aea531ff46181b9244dded7e79d7e8edf890802a60f174aef70abd".parse().unwrap())),
-            100 => (Address::from_str("80b8AcA4689EC911F048c4E0976892cCDE14031E").unwrap(), Some("0xecf8358d08dfdbd9549c0affa2226b062fe78867f156a258bd9da1e05ad842aa".parse().unwrap())),
+            1 => (Address::from_str("0F4648d997e486cE06577d6Ee2FecBcA84b834F4").unwrap(), Some("0xf1c7cf15be13691a358090065fa8a25005038a8c58eb4a2f882f7fa8dd5b9426".parse().unwrap())),
+            4 => (Address::from_str("7C882F296335734B958b35DA6b2595FA00043AE9").unwrap(), Some("0xf1c7cf15be13691a358090065fa8a25005038a8c58eb4a2f882f7fa8dd5b9426".parse().unwrap())),
+            100 => (Address::from_str("0F4648d997e486cE06577d6Ee2FecBcA84b834F4").unwrap(), Some("0x9be0d0f472e3a41c1fb314624965fefbdeb0c5ebe3671c59191a794b68265f10".parse().unwrap())),
         },
     );
     generate_contract(
         "DepositAndPlaceOrder",
         hashmap! {
-            4 => (Address::from_str("6a357cb2ed9230eFAD971d83dcc54981636aEA97").unwrap(), Some("0xdc6b81239087cc685f4bd9f3a9733d3b0fdc54326868dee8b57b4073ef1fc92e".parse().unwrap())),
-            100 => (Address::from_str("69BE2732891A10D6d3d00073A834194Ff3EeB71d").unwrap(), Some("0x2ca9369a435d91e272881aa5c6393df176aa2a5e48bfb19c45fabe8b1d3dea49".parse().unwrap())),
+            1 => (Address::from_str("10D15DEA67f7C95e2F9Fe4eCC245a8862b9B5B96").unwrap(), Some("0x8a88034c1d1729c3a72e2d9d0f05056d5e4155f6f1368882e6f743f0fe3d6966".parse().unwrap())),
+            4 => (Address::from_str("845AbED0734e39614FEC4245F3F3C88E2da98157").unwrap(), Some("0xdc6b81239087cc685f4bd9f3a9733d3b0fdc54326868dee8b57b4073ef1fc92e".parse().unwrap())),
+            100 => (Address::from_str("69BE2732891A10D6d3d00073A834194Ff3EeB71d").unwrap(), Some("0x7d239d8ab763f396739d7988c2bd909851067bf94007b6321d2ef69602104ce6".parse().unwrap())),
         },
     );
     generate_contract(
