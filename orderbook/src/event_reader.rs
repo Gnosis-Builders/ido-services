@@ -5,7 +5,7 @@ use ethcontract::Address;
 use ethcontract::BlockNumber;
 use model::auction_details::AuctionDetails;
 use model::order::Order;
-use model::order::OrderWithAuctionID;
+use model::order::OrderWithAuctionId;
 use model::user::User;
 use primitive_types::{H160, U256};
 use std::convert::TryInto;
@@ -18,9 +18,9 @@ pub struct EventReader {
 }
 
 pub struct OrderUpdates {
-    pub orders_added: Vec<OrderWithAuctionID>,
-    pub orders_removed: Vec<OrderWithAuctionID>,
-    pub orders_claimed: Vec<OrderWithAuctionID>,
+    pub orders_added: Vec<OrderWithAuctionId>,
+    pub orders_removed: Vec<OrderWithAuctionId>,
+    pub orders_claimed: Vec<OrderWithAuctionId>,
     pub users_added: Vec<User>,
     pub last_block_handled: u64,
 }
@@ -129,6 +129,7 @@ impl EventReader {
                 end_time_timestamp: event.data.auction_end_date.as_u64(),
                 starting_timestamp: event_timestamp.unwrap_or(0_u64),
                 current_clearing_price: price_point.price,
+                current_bidding_amount: 0_u64,
                 is_private_auction,
                 chain_id: *chain_id,
                 interest_score: 0_f64,
@@ -141,7 +142,7 @@ impl EventReader {
         &self,
         from_block: u64,
         to_block: u64,
-    ) -> Result<Vec<OrderWithAuctionID>> {
+    ) -> Result<Vec<OrderWithAuctionId>> {
         let mut order_updates = Vec::new();
         let events = self
             .contract
@@ -157,7 +158,7 @@ impl EventReader {
                 buy_amount: U256::from(event.data.buy_amount),
                 user_id: event.data.user_id as u64,
             };
-            let order_update = OrderWithAuctionID {
+            let order_update = OrderWithAuctionId {
                 auction_id: event.data.auction_id.as_u64(),
                 order,
             };
@@ -170,7 +171,7 @@ impl EventReader {
         &self,
         from_block: u64,
         to_block: u64,
-    ) -> Result<Vec<OrderWithAuctionID>> {
+    ) -> Result<Vec<OrderWithAuctionId>> {
         let mut order_updates = Vec::new();
         let events = self
             .contract
@@ -186,7 +187,7 @@ impl EventReader {
                 buy_amount: U256::from(event.data.buy_amount),
                 user_id: event.data.user_id as u64,
             };
-            let order_update = OrderWithAuctionID {
+            let order_update = OrderWithAuctionId {
                 auction_id: event.data.auction_id.as_u64(),
                 order,
             };
@@ -247,7 +248,7 @@ impl EventReader {
         &self,
         from_block: u64,
         to_block: u64,
-    ) -> Result<Vec<OrderWithAuctionID>> {
+    ) -> Result<Vec<OrderWithAuctionId>> {
         let mut order_updates = Vec::new();
         let events = self
             .contract
@@ -263,7 +264,7 @@ impl EventReader {
                 buy_amount: U256::from(event.data.buy_amount),
                 user_id: event.data.user_id as u64,
             };
-            let order_update = OrderWithAuctionID {
+            let order_update = OrderWithAuctionId {
                 auction_id: event.data.auction_id.as_u64(),
                 order,
             };

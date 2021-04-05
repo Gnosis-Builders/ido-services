@@ -16,7 +16,7 @@ pub struct Order {
 }
 
 #[derive(Eq, PartialEq, Clone, Debug, Copy, Default)]
-pub struct OrderWithAuctionID {
+pub struct OrderWithAuctionId {
     pub auction_id: u64,
     pub order: Order,
 }

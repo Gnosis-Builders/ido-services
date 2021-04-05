@@ -3,7 +3,8 @@ use anyhow::Result;
 use ethcontract::Address;
 use lazy_static::lazy_static;
 use model::auction_details::AuctionDetails;
-use model::order::{Order, OrderWithAuctionID, OrderbookDisplay, PricePoint};
+use model::order::TEN;
+use model::order::{Order, OrderWithAuctionId, OrderbookDisplay, PricePoint};
 use model::user::User;
 use primitive_types::H160;
 use primitive_types::U256;
@@ -260,7 +261,7 @@ impl Orderbook {
             .copied()
             .collect()
     }
-    pub async fn get_clearing_order_and_volume(&self, auction_id: u64) -> (Order, U256) {
+    pub async fn get_clearing_order_and_volume(&self, auction_id: u64) -> (Order, U256, U256) {
         // code is one to one copy of smart contract, hence no extensive testing
         let orders = self.get_orders(auction_id).await;
         let initial_order = self.get_initial_order(auction_id).await;
@@ -305,7 +306,15 @@ impl Orderbook {
                     .sell_amount
                     .checked_sub(uncovered_bids)
                     .unwrap();
-                (current_order, sell_amount_clearing_order)
+                (
+                    current_order,
+                    sell_amount_clearing_order,
+                    current_bid_sum
+                        .checked_sub(current_order.sell_amount)
+                        .unwrap()
+                        .checked_add(sell_amount_clearing_order)
+                        .unwrap(),
+                )
             } else {
                 let clearing_order = Order {
                     sell_amount: current_bid_sum
@@ -314,7 +323,13 @@ impl Orderbook {
                     buy_amount: initial_order.sell_amount,
                     user_id: 0_u64,
                 };
-                (clearing_order, U256::zero())
+                (
+                    clearing_order,
+                    U256::zero(),
+                    current_bid_sum
+                        .checked_sub(current_order.sell_amount)
+                        .unwrap(),
+                )
             }
         } else if current_bid_sum.gt(&initial_order.buy_amount) {
             let clearing_order = Order {
@@ -322,7 +337,7 @@ impl Orderbook {
                 sell_amount: current_bid_sum,
                 user_id: 0_u64,
             };
-            (clearing_order, U256::zero())
+            (clearing_order, U256::zero(), current_bid_sum)
         } else {
             let clearing_order = Order {
                 buy_amount: initial_order.sell_amount,
@@ -334,7 +349,7 @@ impl Orderbook {
                 .unwrap()
                 .checked_div(initial_order.buy_amount)
                 .unwrap();
-            (clearing_order, clearing_volume)
+            (clearing_order, clearing_volume, current_bid_sum)
         }
     }
     pub async fn get_previous_order(&self, auction_id: u64, order: Order) -> Order {
@@ -401,9 +416,9 @@ impl Orderbook {
             self.set_auction_details(auction_details.auction_id, auction_details)
                 .await?;
         }
-        let new_orders: Vec<OrderWithAuctionID>;
-        let canceled_orders: Vec<OrderWithAuctionID>;
-        let new_claimed_orders: Vec<OrderWithAuctionID>;
+        let new_orders: Vec<OrderWithAuctionId>;
+        let canceled_orders: Vec<OrderWithAuctionId>;
+        let new_claimed_orders: Vec<OrderWithAuctionId>;
         let new_users: Vec<User>;
         match event_reader.get_order_updates(from_block, to_block).await {
             Ok(order_updates) => {
@@ -481,6 +496,15 @@ impl Orderbook {
                 .price,
         )
         .await?;
+        self.update_current_bidding_amount_of_details(
+            auction_id,
+            new_clearing_price
+                .2
+                .checked_div(TEN.pow(decimals_bidding_token))
+                .unwrap()
+                .as_u64(),
+        )
+        .await?;
         self.update_interest_score(auction_id).await?;
         Ok(())
     }
@@ -532,11 +556,25 @@ impl Orderbook {
         }
         Ok(())
     }
+    pub async fn update_current_bidding_amount_of_details(
+        &self,
+        auction_id: u64,
+        amount: u64,
+    ) -> Result<()> {
+        let mut auction_details_hashmap = self.auction_details.write().await;
+        match auction_details_hashmap.entry(auction_id) {
+            Entry::Occupied(mut details) => {
+                details.get_mut().current_bidding_amount = amount;
+            }
+            Entry::Vacant(_) => {}
+        }
+        Ok(())
+    }
     pub async fn update_interest_score(&self, auction_id: u64) -> Result<()> {
         let mut auction_details_hashmap = self.auction_details.write().await;
         match auction_details_hashmap.entry(auction_id) {
             Entry::Occupied(mut details) => {
-                details.get_mut().interest_score = details.get().bidding_volume();
+                details.get_mut().interest_score = details.get().current_bidding_amount as f64;
             }
             Entry::Vacant(_) => {}
         }
