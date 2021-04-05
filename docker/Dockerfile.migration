@@ -1,4 +1,4 @@
-FROM flyway/flyway:7.5.3
+FROM flyway/flyway:7.7.2-alpine
 
 COPY database/sql sql/
 COPY database/flyway.conf conf/
