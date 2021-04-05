@@ -1,7 +1,5 @@
 use super::*;
 use anyhow::{anyhow, Context, Result};
-use ethcontract::Address;
-use futures::future::join_all;
 use futures::{stream::TryStreamExt, Stream};
 use model::signature_object::SignaturePackage;
 use model::Signature;
@@ -16,23 +14,30 @@ pub struct SignatureFilter {
 }
 
 impl Database {
-    pub async fn insert_signature(
+    pub async fn insert_signatures(
         &self,
-        auction_id: u32,
-        user_address: Address,
-        signature: Signature,
-    ) -> Result<()> {
-        const QUERY: &str = "\
+        auction_id: u64,
+        users_and_signatures: Vec<SignaturePackage>,
+    ) -> Result<(), anyhow::Error> {
+        let mut query = String::from(
+            "\
             INSERT INTO signatures (
                 auction_id, user_address, signature) \
-            VALUES ( \
-                $1, $2, $3);";
-        let result = sqlx::query(QUERY)
-            .bind(auction_id)
-            .bind(user_address.as_bytes())
-            .bind(signature.to_bytes().as_ref())
-            .execute(&self.pool)
-            .await;
+            VALUES ",
+        );
+        for item in users_and_signatures {
+            //todo: find a better way than this forth and back hex encoding
+            query.push_str(&format!(
+                "( {}, decode('{:}', 'hex'),  decode('{}', 'hex')),",
+                auction_id as u32,
+                hex::encode(item.user.as_bytes()),
+                hex::encode(item.signature.to_bytes()),
+            ));
+        }
+        // removing last comma:
+        query = query[..(query.len() - 1)].to_string();
+        query.push(';');
+        let result = sqlx::query(&query).execute(&self.pool).await;
         match result {
             Ok(_) => {
                 return Ok(());
@@ -52,21 +57,6 @@ impl Database {
                 }
             },
         };
-    }
-    pub async fn insert_signatures(
-        &self,
-        auction_id: u64,
-        users_and_signatures: Vec<SignaturePackage>,
-    ) -> Vec<std::result::Result<(), anyhow::Error>> {
-        let mut futures = Vec::new();
-        for signature_pair in users_and_signatures {
-            futures.push(self.insert_signature(
-                auction_id as u32,
-                signature_pair.user,
-                signature_pair.signature,
-            ));
-        }
-        join_all(futures).await
     }
 
     pub fn get_signatures<'a>(
@@ -126,11 +116,23 @@ mod tests {
         let auction_id = 1u32;
         let user_address = H160::zero();
         let signature = Signature::default();
-        db.insert_signature(auction_id, user_address, signature)
-            .await
-            .unwrap();
+        db.insert_signatures(
+            auction_id as u64,
+            vec![SignaturePackage {
+                user: user_address,
+                signature,
+            }],
+        )
+        .await
+        .unwrap();
         assert!(db
-            .insert_signature(auction_id, user_address, signature)
+            .insert_signatures(
+                auction_id as u64,
+                vec![SignaturePackage {
+                    user: user_address,
+                    signature,
+                }],
+            )
             .await
             .is_ok());
         let filter = SignatureFilter {
@@ -161,9 +163,15 @@ mod tests {
         let value = String::from("0x000000000000000000000000000000000000000000000000000000000000001b772598c8cbf75630449d3edfd4dcddd2eab9e2fc2f854de5f17f58742fa3b55a090a5212d1decfa0c0b43e7466e1b1bb623a3a8ec4ac53adc87b6b905f8676f9");
         let signature = Signature::from_str(&value).unwrap();
 
-        db.insert_signature(auction_id as u32, user_address, signature)
-            .await
-            .unwrap();
+        db.insert_signatures(
+            auction_id as u64,
+            vec![SignaturePackage {
+                user: user_address,
+                signature,
+            }],
+        )
+        .await
+        .unwrap();
         assert_eq!(
             db.get_signatures(&filter)
                 .try_collect::<Vec<Signature>>()
@@ -171,6 +179,49 @@ mod tests {
                 .unwrap(),
             vec![signature]
         );
+    }
+    #[tokio::test]
+    #[ignore]
+    async fn postgres_signature_roundtrip_with_2_sigs() {
+        let db = Database::new("postgresql://").unwrap();
+        db.clear().await.unwrap();
+        let auction_id = 33;
+        let filter = SignatureFilter {
+            auction_id,
+            user_address: None,
+        };
+        let user_address = H160::zero();
+        let user_address_2 = "0x04668ec2f57cc15c381b461b9fedab5d451c8f7f"
+            .parse()
+            .unwrap();
+        let value = String::from("0x000000000000000000000000000000000000000000000000000000000000001b772598c8cbf75630449d3edfd4dcddd2eab9e2fc2f854de5f17f58742fa3b55a090a5212d1decfa0c0b43e7466e1b1bb623a3a8ec4ac53adc87b6b905f8676f9");
+        let signature_1 = Signature::from_str(&value).unwrap();
+        let value = String::from("0x000000000000000000000000000000000000000000000000000000000000001b172598c8cbf75630449d3edfd4dcddd2eab9e2fc2f854de5f17f58742fa3b55a090a5212d1decfa0c0b43e7466e1b1bb623a3a8ec4ac53adc87b6b905f8676f9");
+        let signature_2 = Signature::from_str(&value).unwrap();
+
+        db.insert_signatures(
+            auction_id as u64,
+            vec![
+                SignaturePackage {
+                    user: user_address,
+                    signature: signature_1,
+                },
+                SignaturePackage {
+                    user: user_address_2,
+                    signature: signature_2,
+                },
+            ],
+        )
+        .await
+        .unwrap();
+        let result_vec: Vec<Signature> = db
+            .get_signatures(&filter)
+            .try_collect::<Vec<Signature>>()
+            .await
+            .unwrap();
+        let hashset_from_result: HashSet<model::Signature> = HashSet::from_iter(result_vec);
+        let hashset_from_vec = HashSet::from_iter(vec![signature_1, signature_2]);
+        assert_eq!(hashset_from_result, hashset_from_vec);
     }
     #[tokio::test]
     #[ignore]
@@ -191,12 +242,24 @@ mod tests {
         let value = String::from("0x000000000000000000000000000000000000000000000000000000000000001b172598c8cbf75630449d3edfd4dcddd2eab9e2fc2f854de5f17f58742fa3b55a090a5212d1decfa0c0b43e7466e1b1bb623a3a8ec4ac53adc87b6b905f8676f9");
         let signature_2 = Signature::from_str(&value).unwrap();
 
-        db.insert_signature(auction_id as u32, user_address, signature_1)
-            .await
-            .unwrap();
-        db.insert_signature(auction_id as u32, user_address_2, signature_2)
-            .await
-            .unwrap();
+        db.insert_signatures(
+            auction_id as u64,
+            vec![SignaturePackage {
+                user: user_address,
+                signature: signature_1,
+            }],
+        )
+        .await
+        .unwrap();
+        db.insert_signatures(
+            auction_id as u64,
+            vec![SignaturePackage {
+                user: user_address_2,
+                signature: signature_2,
+            }],
+        )
+        .await
+        .unwrap();
         let result_vec: Vec<Signature> = db
             .get_signatures(&filter)
             .try_collect::<Vec<Signature>>()
@@ -225,17 +288,15 @@ mod tests {
             address: "740a98F8f4fAe0986FB3264Fe4aaCf94ac1EE96f".parse().unwrap(),
             user_id: 10_u64,
         };
-        let results = db
-            .insert_signatures(
-                auction_id,
-                vec![SignaturePackage {
-                    user: user.address,
-                    signature,
-                }],
-            )
-            .await;
-        let errors: Vec<anyhow::Error> = results.into_iter().filter_map(|res| res.err()).collect();
-        assert!(errors.is_empty());
+        db.insert_signatures(
+            auction_id,
+            vec![SignaturePackage {
+                user: user.address,
+                signature,
+            }],
+        )
+        .await
+        .unwrap();
         let received_signature = db
             .get_signatures(&SignatureFilter {
                 auction_id: (auction_id as u32),
@@ -265,27 +326,23 @@ mod tests {
             address: "740a98F8f4fAe0986FB3264Fe4aaCf94ac1EE96f".parse().unwrap(),
             user_id: 10_u64,
         };
-        let results = db
-            .insert_signatures(
-                auction_id,
-                vec![SignaturePackage {
-                    user: user.address,
-                    signature,
-                }],
-            )
-            .await;
-        let errors: Vec<anyhow::Error> = results.into_iter().filter_map(|res| res.err()).collect();
-        assert!(errors.is_empty());
-        let results = db
-            .insert_signatures(
-                auction_id,
-                vec![SignaturePackage {
-                    user: user.address,
-                    signature,
-                }],
-            )
-            .await;
-        let errors: Vec<anyhow::Error> = results.into_iter().filter_map(|res| res.err()).collect();
-        assert!(errors.is_empty());
+        db.insert_signatures(
+            auction_id,
+            vec![SignaturePackage {
+                user: user.address,
+                signature,
+            }],
+        )
+        .await
+        .unwrap();
+        db.insert_signatures(
+            auction_id,
+            vec![SignaturePackage {
+                user: user.address,
+                signature,
+            }],
+        )
+        .await
+        .unwrap();
     }
 }

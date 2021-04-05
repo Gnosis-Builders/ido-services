@@ -339,17 +339,15 @@ pub mod test_util {
         };
         let db = Database::new("postgresql://").unwrap();
         db.clear().await.unwrap();
-        let results = db
-            .insert_signatures(
-                auction_id,
-                vec![SignaturePackage {
-                    user: user.address,
-                    signature,
-                }],
-            )
-            .await;
-        let errors: Vec<anyhow::Error> = results.into_iter().filter_map(|res| res.err()).collect();
-        assert!(errors.is_empty());
+        db.insert_signatures(
+            auction_id,
+            vec![SignaturePackage {
+                user: user.address,
+                signature,
+            }],
+        )
+        .await
+        .unwrap();
         let filter = get_signature(db);
         let response = request()
             .path(&format!(

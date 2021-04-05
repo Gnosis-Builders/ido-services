@@ -72,7 +72,6 @@ pub async fn provide_signatures(
     db: Database,
     signature_object: SignaturesObject,
 ) -> Result<impl warp::Reply, Infallible> {
-    let orderbook = orderbook.clone();
     let event_details;
     let event_details_obj = orderbook
         .get_auction_with_details(signature_object.auction_id)
@@ -103,12 +102,13 @@ pub async fn provide_signatures(
             StatusCode::BAD_REQUEST,
         ));
     }
+    let domain_separator_of_call = DomainSeparator::get_domain_separator(
+        signature_object.chain_id,
+        signature_object.allow_list_contract,
+    );
     for signature_pair in signature_object.signatures.clone() {
         let signature_ok = signature_pair.validate_signature(
-            &DomainSeparator::get_domain_separator(
-                signature_object.chain_id,
-                signature_object.allow_list_contract,
-            ),
+            &domain_separator_of_call,
             signature_pair.user,
             signature_object.auction_id,
             event_details.allow_list_signer,
@@ -134,15 +134,11 @@ pub async fn provide_signatures(
     let insert_results = db
         .insert_signatures(signature_object.auction_id, signature_object.signatures)
         .await;
-    let errors: Vec<anyhow::Error> = insert_results
-        .into_iter()
-        .filter_map(|res| res.err())
-        .collect();
-    if !errors.is_empty() {
+    if let Err(error) = insert_results {
         return Ok(with_status(
             json(&format!(
                 "Errors: {:?} while inserting data into database ",
-                errors
+                error
             )),
             StatusCode::BAD_REQUEST,
         ));
