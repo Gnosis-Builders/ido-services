@@ -36,7 +36,7 @@ impl Database {
         }
         // removing last comma:
         query = query[..(query.len() - 1)].to_string();
-        query.push(';');
+        query.push_str(&"ON CONFLICT (auction_id, user_address) DO NOTHING;");
         let result = sqlx::query(&query).execute(&self.pool).await;
         match result {
             Ok(_) => {
@@ -182,10 +182,62 @@ mod tests {
     }
     #[tokio::test]
     #[ignore]
-    async fn postgres_signature_roundtrip_with_2_sigs() {
+    async fn postgres_signature_roundtrip_with_3_sigs() {
         let db = Database::new("postgresql://").unwrap();
         db.clear().await.unwrap();
         let auction_id = 33;
+        let filter = SignatureFilter {
+            auction_id,
+            user_address: None,
+        };
+        let user_address = H160::zero();
+        let user_address_2 = "0x04668ec2f57cc15c381b461b9fedab5d451c8f7f"
+            .parse()
+            .unwrap();
+        let user_address_3 = "0x5BD9518D6Ad05a3709F7A0E5890768bA5AB82369"
+            .parse()
+            .unwrap();
+        let value = String::from("0x000000000000000000000000000000000000000000000000000000000000001b772598c8cbf75630449d3edfd4dcddd2eab9e2fc2f854de5f17f58742fa3b55a090a5212d1decfa0c0b43e7466e1b1bb623a3a8ec4ac53adc87b6b905f8676f9");
+        let signature_1 = Signature::from_str(&value).unwrap();
+        let value = String::from("0x000000000000000000000000000000000000000000000000000000000000001b172598c8cbf75630449d3edfd4dcddd2eab9e2fc2f854de5f17f58742fa3b55a090a5212d1decfa0c0b43e7466e1b1bb623a3a8ec4ac53adc87b6b905f8676f9");
+        let signature_2 = Signature::from_str(&value).unwrap();
+        let value = String::from("0x000000000000000000000000000000000000000000000000000000000000001b05280431f9333d11ea2e6ecc4abe7751a1e30bd6f8a2c1ac8aee27ee7421a1a2540d8cf42e2bfefed647ffb7ae55938b5c751b4cc3999f12f16d9bed7a89d061");
+        let signature_3 = Signature::from_str(&value).unwrap();
+
+        db.insert_signatures(
+            auction_id as u64,
+            vec![
+                SignaturePackage {
+                    user: user_address,
+                    signature: signature_1,
+                },
+                SignaturePackage {
+                    user: user_address_2,
+                    signature: signature_2,
+                },
+                SignaturePackage {
+                    user: user_address_3,
+                    signature: signature_3,
+                },
+            ],
+        )
+        .await
+        .unwrap();
+        let result_vec: Vec<Signature> = db
+            .get_signatures(&filter)
+            .try_collect::<Vec<Signature>>()
+            .await
+            .unwrap();
+        let hashset_from_result: HashSet<model::Signature> = HashSet::from_iter(result_vec);
+        let hashset_from_vec = HashSet::from_iter(vec![signature_1, signature_2, signature_3]);
+        assert_eq!(hashset_from_result, hashset_from_vec);
+    }
+    #[tokio::test]
+    #[ignore]
+    async fn postgres_signature_roundtrip_with_3_sigs_2_times_the_same() {
+        let db = Database::new("postgresql://").unwrap();
+        db.clear().await.unwrap();
+        let auction_id = 35;
         let filter = SignatureFilter {
             auction_id,
             user_address: None,
@@ -198,7 +250,61 @@ mod tests {
         let signature_1 = Signature::from_str(&value).unwrap();
         let value = String::from("0x000000000000000000000000000000000000000000000000000000000000001b172598c8cbf75630449d3edfd4dcddd2eab9e2fc2f854de5f17f58742fa3b55a090a5212d1decfa0c0b43e7466e1b1bb623a3a8ec4ac53adc87b6b905f8676f9");
         let signature_2 = Signature::from_str(&value).unwrap();
-
+        db.insert_signatures(
+            auction_id as u64,
+            vec![
+                SignaturePackage {
+                    user: user_address,
+                    signature: signature_1,
+                },
+                SignaturePackage {
+                    user: user_address_2,
+                    signature: signature_2,
+                },
+                SignaturePackage {
+                    user: user_address_2,
+                    signature: signature_2,
+                },
+            ],
+        )
+        .await
+        .unwrap();
+        let result_vec: Vec<Signature> = db
+            .get_signatures(&filter)
+            .try_collect::<Vec<Signature>>()
+            .await
+            .unwrap();
+        let hashset_from_result: HashSet<model::Signature> = HashSet::from_iter(result_vec);
+        let hashset_from_vec = HashSet::from_iter(vec![signature_1, signature_2]);
+        assert_eq!(hashset_from_result, hashset_from_vec);
+    }
+    #[tokio::test]
+    #[ignore]
+    async fn postgres_signature_roundtrip_with_reinsert() {
+        let db = Database::new("postgresql://").unwrap();
+        db.clear().await.unwrap();
+        let auction_id = 36;
+        let filter = SignatureFilter {
+            auction_id,
+            user_address: None,
+        };
+        let user_address = H160::zero();
+        let user_address_2 = "0x04668ec2f57cc15c381b461b9fedab5d451c8f7f"
+            .parse()
+            .unwrap();
+        let value = String::from("0x000000000000000000000000000000000000000000000000000000000000001b772598c8cbf75630449d3edfd4dcddd2eab9e2fc2f854de5f17f58742fa3b55a090a5212d1decfa0c0b43e7466e1b1bb623a3a8ec4ac53adc87b6b905f8676f9");
+        let signature_1 = Signature::from_str(&value).unwrap();
+        let value = String::from("0x000000000000000000000000000000000000000000000000000000000000001b172598c8cbf75630449d3edfd4dcddd2eab9e2fc2f854de5f17f58742fa3b55a090a5212d1decfa0c0b43e7466e1b1bb623a3a8ec4ac53adc87b6b905f8676f9");
+        let signature_2 = Signature::from_str(&value).unwrap();
+        db.insert_signatures(
+            auction_id as u64,
+            vec![SignaturePackage {
+                user: user_address,
+                signature: signature_1,
+            }],
+        )
+        .await
+        .unwrap();
         db.insert_signatures(
             auction_id as u64,
             vec![
@@ -223,6 +329,7 @@ mod tests {
         let hashset_from_vec = HashSet::from_iter(vec![signature_1, signature_2]);
         assert_eq!(hashset_from_result, hashset_from_vec);
     }
+
     #[tokio::test]
     #[ignore]
     async fn postgres_get_all_signatures_roundtrip() {
