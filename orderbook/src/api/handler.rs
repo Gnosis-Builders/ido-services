@@ -18,7 +18,7 @@ use warp::{
     reply::{json, with_status},
 };
 
-const MAX_JSON_BODY_PAYLOAD: u64 = 1024 * 1600; // rejecting more than 16000k uploads
+const MAX_JSON_BODY_PAYLOAD: u64 = 1024 * 10; // rejecting more than 10kbits uploads
 
 pub fn extract_signatures_object_from_json(
 ) -> impl Filter<Extract = (SignaturesObject,), Error = Rejection> + Clone {
