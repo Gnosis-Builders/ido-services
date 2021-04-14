@@ -104,54 +104,65 @@ pub async fn orderbook_maintenance(
             .expect("maintenance function not successful");
         // most ridiculous swap: Resetting the orderbook_latest to orderbook_protected
         {
-            let mut orderbook = orderbook_latest.orders.write().await;
-            let orderbook_reorg_save = orderbook_reorg_protected.orders.read().await;
-            orderbook.retain(|&k, _| k == 0);
-            for auction_id in orderbook_reorg_save.keys() {
-                orderbook.insert(
-                    *auction_id,
-                    orderbook_reorg_save.get(auction_id).unwrap().clone(),
-                );
+            {
+                let mut orderbook = orderbook_latest.orders.write().await;
+                let orderbook_reorg_save = orderbook_reorg_protected.orders.read().await;
+                orderbook.retain(|&k, _| k == 0);
+                for auction_id in orderbook_reorg_save.keys() {
+                    orderbook.insert(
+                        *auction_id,
+                        orderbook_reorg_save.get(auction_id).unwrap().clone(),
+                    );
+                }
             }
-            let mut orderbook = orderbook_latest.orders_without_claimed.write().await;
-            let orderbook_reorg_save = orderbook_reorg_protected
-                .orders_without_claimed
-                .read()
-                .await;
-            orderbook.retain(|&k, _| k == 0);
-            for auction_id in orderbook_reorg_save.keys() {
-                orderbook.insert(
-                    *auction_id,
-                    orderbook_reorg_save.get(auction_id).unwrap().clone(),
-                );
+            {
+                let mut orderbook = orderbook_latest.orders_without_claimed.write().await;
+                let orderbook_reorg_save = orderbook_reorg_protected
+                    .orders_without_claimed
+                    .read()
+                    .await;
+                orderbook.retain(|&k, _| k == 0);
+                for auction_id in orderbook_reorg_save.keys() {
+                    orderbook.insert(
+                        *auction_id,
+                        orderbook_reorg_save.get(auction_id).unwrap().clone(),
+                    );
+                }
             }
-            let mut orderbook = orderbook_latest.auction_details.write().await;
-            let orderbook_reorg_save = orderbook_reorg_protected.auction_details.read().await;
-            orderbook.retain(|&k, _| k == 0);
-            for auction_id in orderbook_reorg_save.keys() {
-                orderbook.insert(
-                    *auction_id,
-                    orderbook_reorg_save.get(auction_id).unwrap().clone(),
-                );
+            {
+                let mut orderbook = orderbook_latest.auction_details.write().await;
+                let orderbook_reorg_save = orderbook_reorg_protected.auction_details.read().await;
+                orderbook.retain(|&k, _| k == 0);
+                for auction_id in orderbook_reorg_save.keys() {
+                    orderbook.insert(
+                        *auction_id,
+                        orderbook_reorg_save.get(auction_id).unwrap().clone(),
+                    );
+                }
             }
-            let mut users = orderbook_latest.users.write().await;
-            let users_reorg_save = orderbook_reorg_protected.users.read().await;
-            users.retain(|&k, _| k == H160::zero());
-            for address in users_reorg_save.keys() {
-                users.insert(*address, *users_reorg_save.get(address).unwrap());
+            {
+                let mut users = orderbook_latest.users.write().await;
+                let users_reorg_save = orderbook_reorg_protected.users.read().await;
+                users.retain(|&k, _| k == H160::zero());
+                for address in users_reorg_save.keys() {
+                    users.insert(*address, *users_reorg_save.get(address).unwrap());
+                }
             }
-            let mut auction_participation = orderbook_latest.auction_participation.write().await;
-            let auction_participation_reorg_save =
-                orderbook_reorg_protected.auction_participation.read().await;
-            auction_participation.retain(|&k, _| k == 0);
-            for user_ids in auction_participation_reorg_save.keys() {
-                auction_participation.insert(
-                    *user_ids,
-                    auction_participation_reorg_save
-                        .get(user_ids)
-                        .unwrap()
-                        .clone(),
-                );
+            {
+                let mut auction_participation =
+                    orderbook_latest.auction_participation.write().await;
+                let auction_participation_reorg_save =
+                    orderbook_reorg_protected.auction_participation.read().await;
+                auction_participation.retain(|&k, _| k == 0);
+                for user_ids in auction_participation_reorg_save.keys() {
+                    auction_participation.insert(
+                        *user_ids,
+                        auction_participation_reorg_save
+                            .get(user_ids)
+                            .unwrap()
+                            .clone(),
+                    );
+                }
             }
         }
         let mut last_block_considered = last_block_considered_for_reorg_protected_orderbook; // Values are cloned, as we don't wanna store the values.

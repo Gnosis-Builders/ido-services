@@ -176,28 +176,32 @@ impl Orderbook {
         }
     }
     pub async fn get_order_book_display(&self, auction_id: u64) -> Result<OrderbookDisplay> {
-        let orders_hashmap = self.orders.write().await;
-        let reading_guard = self.auction_details.read().await;
-        let decimals_auctioning_token = reading_guard
-            .get(&auction_id)
-            .expect("auction not yet initialized in backend")
-            .decimals_auctioning_token;
-
-        let decimals_bidding_token = reading_guard
-            .get(&auction_id)
-            .expect("auction not yet initialized in backend")
-            .decimals_bidding_token;
-
         let bids: Vec<PricePoint>;
-        if let Some(orders) = orders_hashmap.get(&auction_id) {
-            bids = orders
-                .iter()
-                .map(|order| {
-                    order.to_price_point(decimals_auctioning_token, decimals_bidding_token)
-                })
-                .collect();
-        } else {
-            bids = Vec::new();
+        let decimals_auctioning_token;
+        let decimals_bidding_token;
+        {
+            let orders_hashmap = self.orders.read().await;
+            let reading_guard = self.auction_details.read().await;
+            decimals_auctioning_token = reading_guard
+                .get(&auction_id)
+                .expect("auction not yet initialized in backend")
+                .decimals_auctioning_token;
+
+            decimals_bidding_token = reading_guard
+                .get(&auction_id)
+                .expect("auction not yet initialized in backend")
+                .decimals_bidding_token;
+
+            if let Some(orders) = orders_hashmap.get(&auction_id) {
+                bids = orders
+                    .iter()
+                    .map(|order| {
+                        order.to_price_point(decimals_auctioning_token, decimals_bidding_token)
+                    })
+                    .collect();
+            } else {
+                bids = Vec::new();
+            }
         }
         let initial_order = vec![self.get_initial_order(auction_id).await];
         let asks: Vec<PricePoint> = initial_order
@@ -216,7 +220,6 @@ impl Orderbook {
             .collect();
         Ok(OrderbookDisplay { asks, bids })
     }
-    #[allow(dead_code)]
     pub async fn get_orders(&self, auction_id: u64) -> Vec<Order> {
         let hashmap = self.orders.read().await;
         let empty_vec = Vec::new();
@@ -537,7 +540,6 @@ impl Orderbook {
         let mut auction_detail_list: Vec<AuctionDetails> = Vec::new();
         for auction_id in auction_details_hashmap.keys() {
             let auction_details = auction_details_hashmap.get(&auction_id).unwrap();
-
             auction_detail_list.push(auction_details.clone());
         }
         Ok(auction_detail_list)
