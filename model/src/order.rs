@@ -50,6 +50,25 @@ impl PartialEq for PricePoint {
     }
 }
 impl Eq for PricePoint {}
+
+impl PartialOrd for PricePoint {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for PricePoint {
+    fn cmp(&self, other: &Self) -> Ordering {
+        if self.price > other.price {
+            return Ordering::Less;
+        }
+        if self.price < other.price {
+            return Ordering::Greater;
+        }
+        self.volume.partial_cmp(&other.volume).unwrap()
+    }
+}
+
 impl Order {
     pub fn to_price_point(
         &self,

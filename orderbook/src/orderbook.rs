@@ -15,6 +15,7 @@ use tokio::sync::RwLock;
 #[derive(Default, Debug)]
 pub struct Orderbook {
     pub orders: RwLock<HashMap<u64, Vec<Order>>>,
+    pub orders_display: RwLock<HashMap<u64, Vec<PricePoint>>>,
     pub orders_without_claimed: RwLock<HashMap<u64, Vec<Order>>>,
     pub users: RwLock<HashMap<Address, u64>>,
     pub auction_participation: RwLock<HashMap<u64, HashSet<u64>>>,
@@ -32,6 +33,7 @@ impl Orderbook {
     pub fn new() -> Self {
         Orderbook {
             orders: RwLock::new(HashMap::new()),
+            orders_display: RwLock::new(HashMap::new()),
             orders_without_claimed: RwLock::new(HashMap::new()),
             users: RwLock::new(HashMap::new()),
             auction_participation: RwLock::new(HashMap::new()),
@@ -61,6 +63,25 @@ impl Orderbook {
                 }
                 Entry::Vacant(_) => {
                     hashmap.insert(auction_id, orders.clone());
+                }
+            }
+        }
+        let (decimals_auctioning_token, decimals_bidding_token) =
+            self.get_decimals(auction_id).await;
+        {
+            let mut hashmap = self.orders_display.write().await;
+            let vec_price_points: Vec<PricePoint> = orders
+                .iter()
+                .map(|order| {
+                    order.to_price_point(decimals_auctioning_token, decimals_bidding_token)
+                })
+                .collect();
+            match hashmap.entry(auction_id) {
+                Entry::Occupied(mut order_vec) => {
+                    order_vec.get_mut().extend(vec_price_points);
+                }
+                Entry::Vacant(_) => {
+                    hashmap.insert(auction_id, vec_price_points);
                 }
             }
         }
@@ -122,6 +143,15 @@ impl Orderbook {
             Entry::Vacant(_) => {}
         }
     }
+    pub async fn sort_orders_display(&self, auction_id: u64) {
+        let mut hashmap = self.orders_display.write().await;
+        match hashmap.entry(auction_id) {
+            Entry::Occupied(order_vec) => {
+                order_vec.into_mut().sort();
+            }
+            Entry::Vacant(_) => {}
+        }
+    }
     pub async fn sort_orders_without_claimed(&self, auction_id: u64) {
         let mut hashmap = self.orders_without_claimed.write().await;
         match hashmap.entry(auction_id) {
@@ -130,6 +160,23 @@ impl Orderbook {
             }
             Entry::Vacant(_) => {}
         }
+    }
+    pub async fn get_decimals(&self, auction_id: u64) -> (U256, U256) {
+        let decimals_auctioning_token;
+        let decimals_bidding_token;
+        {
+            let reading_guard = self.auction_details.read().await;
+            decimals_auctioning_token = reading_guard
+                .get(&auction_id)
+                .expect("auction not yet initialized in backend")
+                .decimals_auctioning_token;
+
+            decimals_bidding_token = reading_guard
+                .get(&auction_id)
+                .expect("auction not yet initialized in backend")
+                .decimals_bidding_token;
+        }
+        (decimals_auctioning_token, decimals_bidding_token)
     }
     pub async fn remove_orders(&self, auction_id: u64, orders: Vec<Order>) {
         if orders.is_empty() {
@@ -140,6 +187,25 @@ impl Orderbook {
             match hashmap.entry(auction_id) {
                 Entry::Occupied(order_vec) => {
                     order_vec.into_mut().retain(|x| !orders.contains(x));
+                }
+                Entry::Vacant(_) => (),
+            }
+        }
+        let (decimals_auctioning_token, decimals_bidding_token) =
+            self.get_decimals(auction_id).await;
+        {
+            let mut hashmap = self.orders_display.write().await;
+            let vec_price_points: Vec<PricePoint> = orders
+                .iter()
+                .map(|order| {
+                    order.to_price_point(decimals_auctioning_token, decimals_bidding_token)
+                })
+                .collect();
+            match hashmap.entry(auction_id) {
+                Entry::Occupied(order_vec) => {
+                    order_vec
+                        .into_mut()
+                        .retain(|x| !vec_price_points.contains(x));
                 }
                 Entry::Vacant(_) => (),
             }
@@ -177,28 +243,12 @@ impl Orderbook {
     }
     pub async fn get_order_book_display(&self, auction_id: u64) -> Result<OrderbookDisplay> {
         let bids: Vec<PricePoint>;
-        let decimals_auctioning_token;
-        let decimals_bidding_token;
+        let (decimals_auctioning_token, decimals_bidding_token) =
+            self.get_decimals(auction_id).await;
         {
-            let orders_hashmap = self.orders.read().await;
-            let reading_guard = self.auction_details.read().await;
-            decimals_auctioning_token = reading_guard
-                .get(&auction_id)
-                .expect("auction not yet initialized in backend")
-                .decimals_auctioning_token;
-
-            decimals_bidding_token = reading_guard
-                .get(&auction_id)
-                .expect("auction not yet initialized in backend")
-                .decimals_bidding_token;
-
+            let orders_hashmap = self.orders_display.read().await;
             if let Some(orders) = orders_hashmap.get(&auction_id) {
-                bids = orders
-                    .iter()
-                    .map(|order| {
-                        order.to_price_point(decimals_auctioning_token, decimals_bidding_token)
-                    })
-                    .collect();
+                bids = orders.to_vec();
             } else {
                 bids = Vec::new();
             }
@@ -467,6 +517,7 @@ impl Orderbook {
             )
             .await;
             self.sort_orders(auction_id).await;
+            self.sort_orders_display(auction_id).await;
             self.sort_orders_without_claimed(auction_id).await;
             if let Err(err) = self.update_clearing_price_info(auction_id).await {
                 tracing::debug!("error while calculating the clearing price: {:}", err)
@@ -600,6 +651,10 @@ mod tests {
         };
         let auction_id = 1;
         let orderbook = Orderbook::new();
+        orderbook
+            .set_auction_details(auction_id, AuctionDetails::default())
+            .await
+            .unwrap();
         orderbook.insert_orders(auction_id, vec![order]).await;
         assert_eq!(orderbook.get_orders(auction_id).await, vec![order]);
         let mut expected_hash_set = HashSet::new();
@@ -619,6 +674,10 @@ mod tests {
         };
         let auction_id = 1;
         let orderbook = Orderbook::new();
+        orderbook
+            .set_auction_details(auction_id, AuctionDetails::default())
+            .await
+            .unwrap();
         orderbook.insert_orders(auction_id, vec![order_1]).await;
         let order_2 = Order {
             sell_amount: U256::from_dec_str("1230").unwrap(),
@@ -656,6 +715,10 @@ mod tests {
         };
         let auction_id = 1;
         let mut orderbook = Orderbook::new();
+        orderbook
+            .set_auction_details(auction_id, AuctionDetails::default())
+            .await
+            .unwrap();
         orderbook
             .insert_orders(auction_id, vec![order_1, order_2, order_3])
             .await;
@@ -698,6 +761,10 @@ mod tests {
         let auction_id = 1;
         let mut orderbook = Orderbook::new();
         orderbook
+            .set_auction_details(auction_id, AuctionDetails::default())
+            .await
+            .unwrap();
+        orderbook
             .insert_orders(auction_id, vec![order_1, order_2, order_3, order_4])
             .await;
         orderbook
@@ -731,6 +798,11 @@ mod tests {
             buy_amount: U256::from_dec_str("3").unwrap(),
             user_id: 9_u64,
         };
+
+        orderbook
+            .set_auction_details(auction_id, AuctionDetails::default())
+            .await
+            .unwrap();
         orderbook
             .insert_orders(auction_id, vec![order_1, order_3])
             .await;

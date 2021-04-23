@@ -173,6 +173,10 @@ pub mod test_util {
             buy_amount: U256::from_dec_str("3").unwrap(),
             user_id: 10_u64,
         };
+        orderbook
+            .set_auction_details(auction_id, AuctionDetails::default())
+            .await
+            .unwrap();
         orderbook.insert_orders(auction_id, vec![order_1]).await;
         let filter = get_previous_order(Arc::new(orderbook));
         let response = request()
@@ -203,6 +207,10 @@ pub mod test_util {
             address: "740a98F8f4fAe0986FB3264Fe4aaCf94ac1EE96f".parse().unwrap(),
             user_id: 10_u64,
         };
+        orderbook
+            .set_auction_details(auction_id, AuctionDetails::default())
+            .await
+            .unwrap();
         orderbook
             .insert_orders(auction_id, vec![order_1, order_2])
             .await;
@@ -248,6 +256,11 @@ pub mod test_util {
             address: "740a98F8f4fAe0986FB3264Fe4aaCf94ac1EE96f".parse().unwrap(),
             user_id: 10_u64,
         };
+
+        orderbook
+            .set_auction_details(auction_id, AuctionDetails::default())
+            .await
+            .unwrap();
         orderbook
             .insert_orders(auction_id, vec![order_1, order_2])
             .await;
@@ -293,10 +306,7 @@ pub mod test_util {
             address: "740a98F8f4fAe0986FB3264Fe4aaCf94ac1EE96f".parse().unwrap(),
             user_id: 10_u64,
         };
-        orderbook
-            .insert_orders(auction_id, vec![order_1, order_2])
-            .await;
-        orderbook.insert_users(vec![user]).await;
+
         let auction_details = AuctionDetails {
             auction_id,
             ..Default::default()
@@ -305,6 +315,10 @@ pub mod test_util {
             .set_auction_details(auction_id, auction_details)
             .await
             .unwrap();
+        orderbook
+            .insert_orders(auction_id, vec![order_1, order_2])
+            .await;
+        orderbook.insert_users(vec![user]).await;
         let filter = get_all_auction_with_details_with_user_participation(Arc::new(orderbook));
         let response = request()
             .path(&format!(
