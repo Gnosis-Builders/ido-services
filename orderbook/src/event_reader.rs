@@ -97,6 +97,12 @@ impl EventReader {
             let auctioning_erc20_contract =
                 contracts::ERC20::at(&self.web3, address_auctioning_token);
             let symbol_auctioning_token = auctioning_erc20_contract.symbol().call().await?;
+            let auction_details_from_rpc_call = self
+                .contract
+                .auction_data(event.data.auction_id)
+                .call()
+                .await?;
+            let is_atomic_closure_allowed = auction_details_from_rpc_call.11;
             let decimals_auctioning_token =
                 U256::from(auctioning_erc20_contract.decimals().call().await?);
             let symbol_bidding_token = bidding_erc20_contract.symbol().call().await?;
@@ -131,6 +137,7 @@ impl EventReader {
                 current_clearing_price: price_point.price,
                 current_bidding_amount: 0_u64,
                 is_private_auction,
+                is_atomic_closure_allowed,
                 chain_id: *chain_id,
                 interest_score: 0_f64,
             });

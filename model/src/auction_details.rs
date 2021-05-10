@@ -26,6 +26,7 @@ pub struct AuctionDetails {
     pub allow_list_signer: Address,
     pub current_clearing_price: f64,
     pub current_bidding_amount: u64,
+    pub is_atomic_closure_allowed: bool,
     pub is_private_auction: bool,
     pub chain_id: U256,
     pub interest_score: f64,
