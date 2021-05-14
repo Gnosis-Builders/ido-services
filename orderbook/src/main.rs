@@ -55,9 +55,10 @@ const MAINTENANCE_INTERVAL: Duration = Duration::from_secs(3);
 // Todo: duplication from build file.
 lazy_static! {
     pub static ref EASY_AUCTION_DEPLOYMENT_INFO: HashMap::<u32, (Address, Option<H256>)> = hashmap! {
-    1 => (Address::from_str("0b7fFc1f4AD541A4Ed16b40D8c37f0929158D101").unwrap(), Some("0xa7ad659a9762720bd86a30b49a3e139928cc2a27d0863ab78110e19d2bef8a51".parse().unwrap())),
-    4 => (Address::from_str("C5992c0e0A3267C7F75493D0F717201E26BE35f7").unwrap(), Some("0xbdd1dde815a908d407ec89fa9bc317d9e33621ccc6452ac0eb00fe2ed0d81ff4".parse().unwrap())),
-    100 => (Address::from_str("0b7fFc1f4AD541A4Ed16b40D8c37f0929158D101").unwrap(), Some("0x5af5443ba9add113a42b0219ac8f398c383dc5a3684a221fd24c5655b8316931".parse().unwrap())),
+        1 => (Address::from_str("0b7fFc1f4AD541A4Ed16b40D8c37f0929158D101").unwrap(), Some("0xa7ad659a9762720bd86a30b49a3e139928cc2a27d0863ab78110e19d2bef8a51".parse().unwrap())),
+        4 => (Address::from_str("C5992c0e0A3267C7F75493D0F717201E26BE35f7").unwrap(), Some("0xbdd1dde815a908d407ec89fa9bc317d9e33621ccc6452ac0eb00fe2ed0d81ff4".parse().unwrap())),
+        100 => (Address::from_str("0b7fFc1f4AD541A4Ed16b40D8c37f0929158D101").unwrap(), Some("0x5af5443ba9add113a42b0219ac8f398c383dc5a3684a221fd24c5655b8316931".parse().unwrap())),
+        137 => (Address::from_str("0b7fFc1f4AD541A4Ed16b40D8c37f0929158D101").unwrap(), Some("0x6093f70c46350202181e9b0edfcf8f0e966ddddeb8b24e8b73dd2ab636c1ce87".parse().unwrap())),
     };
 }
 
