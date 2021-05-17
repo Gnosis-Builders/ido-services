@@ -122,7 +122,7 @@ async fn event_parsing() {
             health,
             API_HOST[7..].parse().expect("Couldn't parse API address"),
         );
-        let event_reader = EventReader::new(easy_auction, web3);
+        let event_reader = EventReader::new(easy_auction, web3, 100u64);
         let mut last_block_considered = 1u64;
 
         orderbook::orderbook::Orderbook::run_maintenance(

@@ -41,6 +41,14 @@ struct Arguments {
     )]
     pub node_url: Url,
 
+    /// Number of blocks to sync in bulk.
+    #[structopt(
+        long,
+        env = "NUMBER_OF_BLOCKS_TO_SYNC_PER_REQUEST",
+        default_value = "10000"
+    )]
+    pub number_of_blocks_to_sync_per_request: u64,
+
     /// Timeout for web3 operations on the node in seconds.
     #[structopt(
                 long,
@@ -208,7 +216,11 @@ async fn main() {
     let easy_auction_contract = EasyAuction::deployed(&web3)
         .await
         .expect("Couldn't load deployed easyAuction");
-    let event_reader = EventReader::new(easy_auction_contract, web3);
+    let event_reader = EventReader::new(
+        easy_auction_contract,
+        web3,
+        args.number_of_blocks_to_sync_per_request,
+    );
     let database = Database::new(args.db_url.as_str()).expect("failed to create database");
     let orderbook_latest = Arc::new(Orderbook::new());
     let orderbook_reorg_save = Arc::new(Orderbook::new());

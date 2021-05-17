@@ -15,6 +15,7 @@ use web3::Web3;
 pub struct EventReader {
     pub contract: EasyAuction,
     pub web3: Web3<web3::transports::Http>,
+    pub number_of_blocks_to_sync_per_request: u64,
 }
 
 pub struct OrderUpdates {
@@ -31,11 +32,18 @@ pub struct DataFromEvent {
 }
 
 const BLOCK_CONFIRMATION_COUNT: u64 = 10;
-const NUMBER_OF_BLOCKS_TO_SYNC_PER_REQUEST: u64 = 10000;
 
 impl EventReader {
-    pub fn new(contract: EasyAuction, web3: Web3<web3::transports::Http>) -> Self {
-        Self { contract, web3 }
+    pub fn new(
+        contract: EasyAuction,
+        web3: Web3<web3::transports::Http>,
+        number_of_blocks_to_sync_per_request: u64,
+    ) -> Self {
+        Self {
+            contract,
+            web3,
+            number_of_blocks_to_sync_per_request,
+        }
     }
 
     pub async fn get_order_updates(&self, from_block: u64, to_block: u64) -> Result<OrderUpdates> {
@@ -241,8 +249,11 @@ impl EventReader {
         if from_block > to_block {
             anyhow::bail!("Benign interruption: from_block > to_block for updating events")
         }
-        if from_block + NUMBER_OF_BLOCKS_TO_SYNC_PER_REQUEST < to_block {
-            to_block = std::cmp::min(to_block, from_block + NUMBER_OF_BLOCKS_TO_SYNC_PER_REQUEST);
+        if from_block + self.number_of_blocks_to_sync_per_request < to_block {
+            to_block = std::cmp::min(
+                to_block,
+                from_block + self.number_of_blocks_to_sync_per_request,
+            );
         }
         info!(
             "Updating event based orderbook from block {} to block {} ",
