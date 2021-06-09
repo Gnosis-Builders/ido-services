@@ -108,6 +108,7 @@ pub async fn orderbook_maintenance(
                 &event_reader,
                 &mut last_block_considered_for_reorg_protected_orderbook,
                 true,
+                chain_id.as_u32(),
             )
             .await
             .expect("maintenance function not successful");
@@ -187,7 +188,12 @@ pub async fn orderbook_maintenance(
         }
         let mut last_block_considered = last_block_considered_for_reorg_protected_orderbook; // Values are cloned, as we don't wanna store the values.
         orderbook_latest
-            .run_maintenance(&event_reader, &mut last_block_considered, false)
+            .run_maintenance(
+                &event_reader,
+                &mut last_block_considered,
+                false,
+                chain_id.as_u32(),
+            )
             .await
             .expect("maintenance function not successful");
 

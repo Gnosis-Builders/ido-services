@@ -148,6 +148,7 @@ impl EventReader {
                 is_atomic_closure_allowed,
                 chain_id: *chain_id,
                 interest_score: 0_f64,
+                usd_amount_traded: 0_f64,
             });
         }
         Ok(new_auction)

@@ -2,6 +2,7 @@ use crate::event_reader::EventReader;
 use anyhow::Result;
 use ethcontract::Address;
 use lazy_static::lazy_static;
+use maplit::hashmap;
 use model::auction_details::AuctionDetails;
 use model::order::TEN;
 use model::order::{Order, OrderWithAuctionId, OrderbookDisplay, PricePoint};
@@ -9,6 +10,7 @@ use model::user::User;
 use primitive_types::H160;
 use primitive_types::U256;
 use std::collections::{hash_map::Entry, HashMap, HashSet};
+use std::str::FromStr;
 use std::time::SystemTime;
 use tokio::sync::RwLock;
 
@@ -21,6 +23,15 @@ pub struct Orderbook {
     pub auction_participation: RwLock<HashMap<u64, HashSet<u64>>>,
     pub auction_details: RwLock<HashMap<u64, AuctionDetails>>,
 }
+lazy_static! {
+    pub static ref LEGIT_STABLE_COINS: HashMap::<u32, Vec<Address>> = hashmap! {
+        1 => vec![Address::from_str("0x6b175474e89094c44da98b954eedeac495271d0f").unwrap(),Address::from_str("0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48").unwrap(), Address::from_str("0xdac17f958d2ee523a2206206994597c13d831ec7").unwrap()],
+        4 => vec![Address::from_str("0x5592EC0cfb4dbc12D3aB100b257153436a1f0FEa").unwrap(),Address::from_str("0x4DBCdF9B62e891a7cec5A2568C3F4FAF9E8Abe2b").unwrap()],
+        100 => vec![Address::from_str("0xe91D153E0b41518A2Ce8Dd3D7944Fa863463a97d").unwrap()],
+        137 => vec![Address::from_str("0x8f3Cf7ad23Cd3CaDbD9735AFf958023239c6A063").unwrap(), Address::from_str("0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174").unwrap()],
+    };
+}
+
 lazy_static! {
     pub static ref QUEUE_START: Order = Order {
         buy_amount: U256::from_dec_str("0").unwrap(),
@@ -436,6 +447,7 @@ impl Orderbook {
         event_reader: &EventReader,
         last_block_considered: &mut u64,
         reorg_protection: bool,
+        chain_id: u32,
     ) -> Result<()> {
         let (from_block, to_block);
         match event_reader
@@ -519,14 +531,14 @@ impl Orderbook {
             self.sort_orders(auction_id).await;
             self.sort_orders_display(auction_id).await;
             self.sort_orders_without_claimed(auction_id).await;
-            if let Err(err) = self.update_clearing_price_info(auction_id).await {
+            if let Err(err) = self.update_clearing_price_info(auction_id, chain_id).await {
                 tracing::debug!("error while calculating the clearing price: {:}", err)
             };
         }
         *last_block_considered = to_block;
         Ok(())
     }
-    pub async fn update_clearing_price_info(&self, auction_id: u64) -> Result<()> {
+    pub async fn update_clearing_price_info(&self, auction_id: u64, chain_id: u32) -> Result<()> {
         let new_clearing_price = self.get_clearing_order_and_volume(auction_id).await;
         let decimals_auctioning_token;
         let decimals_bidding_token;
@@ -560,6 +572,8 @@ impl Orderbook {
         )
         .await?;
         self.update_interest_score(auction_id).await?;
+        self.update_usd_amount_traded_of_details(auction_id, chain_id)
+            .await?;
         Ok(())
     }
     pub async fn get_most_interesting_auctions(
@@ -585,6 +599,34 @@ impl Orderbook {
             non_closed_auctions = non_closed_auctions[0..(number_of_auctions as usize)].to_vec()
         }
         Ok(non_closed_auctions)
+    }
+    pub async fn get_most_interesting_closed_auctions(
+        &self,
+        number_of_auctions: u64,
+    ) -> Result<Vec<AuctionDetails>> {
+        let auction_details_hashmap = self.auction_details.read().await;
+        let mut closed_auctions: Vec<AuctionDetails> = Vec::new();
+        for auction_id in auction_details_hashmap.keys() {
+            let auction_details = auction_details_hashmap.get(&auction_id).unwrap();
+            if auction_details.end_time_timestamp
+                < SystemTime::now()
+                    .duration_since(SystemTime::UNIX_EPOCH)
+                    .unwrap()
+                    .as_secs()
+            {
+                closed_auctions.push(auction_details.clone());
+            }
+        }
+        closed_auctions.sort_by(|a, b| {
+            a.usd_amount_traded
+                .partial_cmp(&b.usd_amount_traded)
+                .unwrap()
+        });
+        closed_auctions.reverse();
+        if closed_auctions.len() > number_of_auctions as usize {
+            closed_auctions = closed_auctions[0..(number_of_auctions as usize)].to_vec()
+        }
+        Ok(closed_auctions)
     }
     pub async fn get_all_auction_with_details(&self) -> Result<Vec<AuctionDetails>> {
         let auction_details_hashmap = self.auction_details.read().await;
@@ -628,6 +670,34 @@ impl Orderbook {
         match auction_details_hashmap.entry(auction_id) {
             Entry::Occupied(mut details) => {
                 details.get_mut().interest_score = details.get().current_bidding_amount as f64;
+            }
+            Entry::Vacant(_) => {}
+        }
+        Ok(())
+    }
+    pub async fn update_usd_amount_traded_of_details(
+        &self,
+        auction_id: u64,
+        chain_id: u32,
+    ) -> Result<()> {
+        let mut auction_details_hashmap = self.auction_details.write().await;
+        match auction_details_hashmap.entry(auction_id) {
+            Entry::Occupied(mut details) => {
+                let current_bidding_amount = details.get().current_bidding_amount as f64;
+                let auctioning_token = details.get().address_auctioning_token;
+                let bidding_token_address = details.get().address_bidding_token;
+                let empty_stable_coin_list: Vec<Address> = Vec::new();
+                let legit_stable_coins = LEGIT_STABLE_COINS
+                    .get(&chain_id)
+                    .unwrap_or(&empty_stable_coin_list);
+                if legit_stable_coins.contains(&bidding_token_address) {
+                    details.get_mut().usd_amount_traded = current_bidding_amount;
+                } else if legit_stable_coins.contains(&auctioning_token) {
+                    details.get_mut().usd_amount_traded =
+                        (current_bidding_amount) / (details.get().current_clearing_price as f64);
+                } else {
+                    details.get_mut().usd_amount_traded = 0f64;
+                }
             }
             Entry::Vacant(_) => {}
         }

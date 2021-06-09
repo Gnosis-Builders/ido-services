@@ -30,6 +30,7 @@ pub struct AuctionDetails {
     pub is_private_auction: bool,
     pub chain_id: U256,
     pub interest_score: f64,
+    pub usd_amount_traded: f64,
 }
 
 impl AuctionDetails {

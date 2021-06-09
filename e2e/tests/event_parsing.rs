@@ -19,6 +19,8 @@ async fn event_parsing() {
         tracing_setup::initialize("debug");
 
         let accounts: Vec<Address> = web3.eth().accounts().await.expect("get accounts failed");
+        let chain_id = web3.eth().chain_id().await.unwrap();
+
         let auctioneer = Account::Local(accounts[0], None);
         let trader_a = Account::Local(accounts[1], None);
 
@@ -130,6 +132,7 @@ async fn event_parsing() {
             &event_reader,
             &mut last_block_considered,
             false,
+            chain_id.as_u32(),
         )
         .await
         .unwrap();
@@ -154,12 +157,12 @@ async fn event_parsing() {
         assert_eq!(bids, vec![expected_price_point]);
 
         //rerunning the maintenance function should not change the result
-
         orderbook::orderbook::Orderbook::run_maintenance(
             &orderbook,
             &event_reader,
             &mut last_block_considered,
             false,
+            chain_id.as_u32(),
         )
         .await
         .unwrap();

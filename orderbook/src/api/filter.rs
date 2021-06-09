@@ -99,6 +99,15 @@ pub fn get_details_of_most_interesting_auctions(
         .and_then(handler::get_details_of_most_interesting_auctions)
 }
 
+pub fn get_details_of_most_interesting_closed_auctions(
+    orderbook: Arc<Orderbook>,
+) -> impl Filter<Extract = (impl warp::Reply,), Error = warp::Rejection> + Clone {
+    warp::path!("get_details_of_most_interesting_closed_auctions" / u64)
+        .and(warp::get())
+        .and(with_orderbook(orderbook))
+        .and_then(handler::get_details_of_most_interesting_closed_auctions)
+}
+
 pub fn get_auction_with_details(
     orderbook: Arc<Orderbook>,
 ) -> impl Filter<Extract = (impl warp::Reply,), Error = warp::Rejection> + Clone {
