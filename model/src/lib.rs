@@ -22,7 +22,7 @@ pub struct Signature {
 
 impl Signature {
     /// v + r + s
-    pub fn to_bytes(&self) -> [u8; 65] {
+    pub fn convert_to_bytes(&self) -> [u8; 65] {
         let mut bytes = [0u8; 65];
         bytes[0] = self.v;
         bytes[1..33].copy_from_slice(self.r.as_bytes());
@@ -65,7 +65,7 @@ impl Display for Signature {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let mut bytes = [0u8; 65 * 2];
         // Can only fail if the buffer size does not match but we know it is correct.
-        hex::encode_to_slice(&self.to_bytes(), &mut bytes).unwrap();
+        hex::encode_to_slice(&self.convert_to_bytes(), &mut bytes).unwrap();
         // Hex encoding is always valid utf8.
         let str = std::str::from_utf8(&bytes).unwrap();
         let mut full_str =

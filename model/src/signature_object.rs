@@ -130,17 +130,14 @@ mod tests {
             deserialized_signatures.allow_list_contract,
         );
         for signature_pair in deserialized_signatures.signatures {
-            assert_eq!(
-                true,
-                signature_pair
-                    .validate_signature(
-                        &domain_separator_rinkeby,
-                        signature_pair.user,
-                        deserialized_signatures.auction_id,
-                        signer
-                    )
-                    .unwrap()
-            )
+            assert!(signature_pair
+                .validate_signature(
+                    &domain_separator_rinkeby,
+                    signature_pair.user,
+                    deserialized_signatures.auction_id,
+                    signer
+                )
+                .unwrap())
         }
     }
 }

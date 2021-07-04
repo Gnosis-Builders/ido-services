@@ -5,6 +5,7 @@ use orderbook::database::Database;
 use orderbook::event_reader::EventReader;
 use orderbook::health::HttpHealthEndpoint;
 use orderbook::orderbook::{Orderbook, QUEUE_START};
+use orderbook::subgraph::uniswap_graph_api::UniswapSubgraphClient;
 use serde_json::Value;
 use std::{str::FromStr, sync::Arc};
 
@@ -126,10 +127,12 @@ async fn event_parsing() {
         );
         let event_reader = EventReader::new(easy_auction, web3, 100u64);
         let mut last_block_considered = 1u64;
+        let mut the_graph_reader = UniswapSubgraphClient::for_chain(1).unwrap();
 
         orderbook::orderbook::Orderbook::run_maintenance(
             &orderbook,
             &event_reader,
+            &mut the_graph_reader,
             &mut last_block_considered,
             false,
             chain_id.as_u32(),
@@ -155,11 +158,13 @@ async fn event_parsing() {
         let bids: Vec<PricePoint> =
             serde_json::from_value(orderbook_value["bids"].clone()).unwrap();
         assert_eq!(bids, vec![expected_price_point]);
+        let mut the_graph_reader = UniswapSubgraphClient::for_chain(1).unwrap();
 
         //rerunning the maintenance function should not change the result
         orderbook::orderbook::Orderbook::run_maintenance(
             &orderbook,
             &event_reader,
+            &mut the_graph_reader,
             &mut last_block_considered,
             false,
             chain_id.as_u32(),

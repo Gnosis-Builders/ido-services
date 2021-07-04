@@ -117,7 +117,7 @@ impl EventReader {
             let decimals_bidding_token =
                 U256::from(bidding_erc20_contract.decimals().call().await?);
             let price_point = order
-                .to_price_point(decimals_bidding_token, decimals_auctioning_token)
+                .convert_to_price_point(decimals_bidding_token, decimals_auctioning_token)
                 .invert_price();
             let mut is_private_auction = true;
             let allow_list_signer: Address = get_address_from_bytes(event.data.allow_list_data);

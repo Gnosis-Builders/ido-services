@@ -3,6 +3,7 @@ pub mod database;
 pub mod event_reader;
 pub mod health;
 pub mod orderbook;
+pub mod subgraph;
 
 use crate::database::Database;
 use crate::health::HttpHealthEndpoint;

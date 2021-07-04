@@ -31,7 +31,7 @@ impl Database {
                 "( {}, decode('{:}', 'hex'),  decode('{}', 'hex')),",
                 auction_id as u32,
                 hex::encode(item.user.as_bytes()),
-                hex::encode(item.signature.to_bytes()),
+                hex::encode(item.signature.convert_to_bytes()),
             ));
         }
         // removing last comma:
@@ -39,9 +39,7 @@ impl Database {
         query.push_str(&"ON CONFLICT (auction_id, user_address) DO NOTHING;");
         let result = sqlx::query(&query).execute(&self.pool).await;
         match result {
-            Ok(_) => {
-                return Ok(());
-            }
+            Ok(_) => Ok(()),
             Err(error) => match error {
                 sqlx::Error::Database(err) => {
                     // duplicate key errors are okay, as this means that the signature was already provided before
@@ -50,13 +48,11 @@ impl Database {
                     if err.message().contains("duplicate key") {
                         return Ok(());
                     }
-                    return Err(sqlx::Error::Database(err)).context("insert_signature failed");
+                    Err(sqlx::Error::Database(err)).context("insert_signature failed")
                 }
-                other_error => {
-                    return Err(other_error).context("insert_signature failed");
-                }
+                other_error => Err(other_error).context("insert_signature failed"),
             },
-        };
+        }
     }
 
     pub fn get_signatures<'a>(

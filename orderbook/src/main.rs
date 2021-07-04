@@ -8,6 +8,7 @@ use orderbook::health::HealthReporting;
 use orderbook::health::HttpHealthEndpoint;
 use orderbook::orderbook::Orderbook;
 use orderbook::serve_task;
+use orderbook::subgraph::uniswap_graph_api::UniswapSubgraphClient;
 use primitive_types::H256;
 use std::num::ParseFloatError;
 use std::sync::Arc;
@@ -74,6 +75,7 @@ pub async fn orderbook_maintenance(
     orderbook_latest: Arc<Orderbook>,
     orderbook_reorg_protected: Arc<Orderbook>,
     event_reader: EventReader,
+    mut the_graph_reader: UniswapSubgraphClient,
     health: Arc<HttpHealthEndpoint>,
 ) -> ! {
     // First block considered for synchronization should be the one, in which the deployment
@@ -101,11 +103,13 @@ pub async fn orderbook_maintenance(
         None => tracing::error!("Deployment block was not found"),
     }
 
+    let mut fully_indexed_events = false;
     loop {
         tracing::debug!("running order book maintenance with reorg protection");
         orderbook_reorg_protected
             .run_maintenance(
                 &event_reader,
+                &mut the_graph_reader,
                 &mut last_block_considered_for_reorg_protected_orderbook,
                 true,
                 chain_id.as_u32(),
@@ -190,6 +194,7 @@ pub async fn orderbook_maintenance(
         orderbook_latest
             .run_maintenance(
                 &event_reader,
+                &mut the_graph_reader,
                 &mut last_block_considered,
                 false,
                 chain_id.as_u32(),
@@ -204,9 +209,14 @@ pub async fn orderbook_maintenance(
             .await
             .unwrap_or_else(|_| web3::types::U64::zero())
             .as_u64();
-        tokio::time::delay_for(MAINTENANCE_INTERVAL).await;
+
         if current_block == last_block_considered {
             health.notify_ready();
+            fully_indexed_events = true;
+            tracing::debug!("Orderbook fully synced");
+        }
+        if fully_indexed_events {
+            tokio::time::delay_for(MAINTENANCE_INTERVAL).await;
         }
     }
 }
@@ -230,6 +240,7 @@ async fn main() {
     let database = Database::new(args.db_url.as_str()).expect("failed to create database");
     let orderbook_latest = Arc::new(Orderbook::new());
     let orderbook_reorg_save = Arc::new(Orderbook::new());
+    let the_graph_reader = UniswapSubgraphClient::for_chain(1).unwrap();
     let health = Arc::new(HttpHealthEndpoint::new());
     let serve_task = serve_task(
         orderbook_latest.clone(),
@@ -241,6 +252,7 @@ async fn main() {
         orderbook_latest,
         orderbook_reorg_save,
         event_reader,
+        the_graph_reader,
         health,
     ));
     tokio::select! {

@@ -70,7 +70,7 @@ impl Ord for PricePoint {
 }
 
 impl Order {
-    pub fn to_price_point(
+    pub fn convert_to_price_point(
         &self,
         decimals_buy_token: U256,
         decimals_sell_token: U256,
@@ -218,7 +218,7 @@ mod tests {
     }
 
     #[test]
-    fn to_price_point_with_18_digits() {
+    fn convert_to_price_point_with_18_digits() {
         let normal_order = Order {
             sell_amount: U256::from_dec_str("100000000000000000000").unwrap(),
             buy_amount: U256::from_dec_str("110000000000000000000").unwrap(),
@@ -229,12 +229,12 @@ mod tests {
             volume: 100.0_f64,
         };
         assert_eq!(
-            normal_order.to_price_point(*EIGHTEEN, *EIGHTEEN),
+            normal_order.convert_to_price_point(*EIGHTEEN, *EIGHTEEN),
             expected_price_point
         );
     }
     #[test]
-    fn to_price_point_without_18_digits() {
+    fn convert_to_price_point_without_18_digits() {
         let normal_order = Order {
             sell_amount: U256::from_dec_str("100000000000000000000").unwrap(),
             buy_amount: U256::from_dec_str("110000000000000000000").unwrap(),
@@ -245,7 +245,7 @@ mod tests {
             volume: 100.0_f64,
         };
         assert_eq!(
-            normal_order.to_price_point(U256::from("6"), *EIGHTEEN),
+            normal_order.convert_to_price_point(U256::from("6"), *EIGHTEEN),
             expected_price_point
         );
     }

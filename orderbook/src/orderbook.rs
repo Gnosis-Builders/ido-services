@@ -1,4 +1,5 @@
 use crate::event_reader::EventReader;
+use crate::subgraph::uniswap_graph_api::UniswapSubgraphClient;
 use anyhow::Result;
 use ethcontract::Address;
 use lazy_static::lazy_static;
@@ -29,6 +30,9 @@ lazy_static! {
         4 => vec![Address::from_str("0x5592EC0cfb4dbc12D3aB100b257153436a1f0FEa").unwrap(),Address::from_str("0x4DBCdF9B62e891a7cec5A2568C3F4FAF9E8Abe2b").unwrap()],
         100 => vec![Address::from_str("0xe91D153E0b41518A2Ce8Dd3D7944Fa863463a97d").unwrap()],
         137 => vec![Address::from_str("0x8f3Cf7ad23Cd3CaDbD9735AFf958023239c6A063").unwrap(), Address::from_str("0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174").unwrap()],
+    };
+    pub static ref PRICE_FEED_SUPPORTED_TOKENS: HashMap::<u32, Vec<Address>> = hashmap! {
+     1 => vec![Address::from_str("0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2").unwrap()],
     };
 }
 
@@ -84,7 +88,7 @@ impl Orderbook {
             let vec_price_points: Vec<PricePoint> = orders
                 .iter()
                 .map(|order| {
-                    order.to_price_point(decimals_auctioning_token, decimals_bidding_token)
+                    order.convert_to_price_point(decimals_auctioning_token, decimals_bidding_token)
                 })
                 .collect();
             match hashmap.entry(auction_id) {
@@ -209,7 +213,7 @@ impl Orderbook {
             let vec_price_points: Vec<PricePoint> = orders
                 .iter()
                 .map(|order| {
-                    order.to_price_point(decimals_auctioning_token, decimals_bidding_token)
+                    order.convert_to_price_point(decimals_auctioning_token, decimals_bidding_token)
                 })
                 .collect();
             match hashmap.entry(auction_id) {
@@ -274,7 +278,7 @@ impl Orderbook {
             })
             .map(|order| {
                 order
-                    .to_price_point(decimals_bidding_token, decimals_auctioning_token)
+                    .convert_to_price_point(decimals_bidding_token, decimals_auctioning_token)
                     // << invert price for unified representation of different orders.
                     .invert_price()
             })
@@ -445,6 +449,7 @@ impl Orderbook {
     pub async fn run_maintenance(
         &self,
         event_reader: &EventReader,
+        mut the_graph_reader: &mut UniswapSubgraphClient,
         last_block_considered: &mut u64,
         reorg_protection: bool,
         chain_id: u32,
@@ -528,17 +533,25 @@ impl Orderbook {
                     .collect(),
             )
             .await;
+            self.sort_orders_without_claimed(auction_id).await;
             self.sort_orders(auction_id).await;
             self.sort_orders_display(auction_id).await;
-            self.sort_orders_without_claimed(auction_id).await;
-            if let Err(err) = self.update_clearing_price_info(auction_id, chain_id).await {
+            if let Err(err) = self
+                .update_clearing_price_info(&mut the_graph_reader, auction_id, chain_id)
+                .await
+            {
                 tracing::debug!("error while calculating the clearing price: {:}", err)
             };
         }
         *last_block_considered = to_block;
         Ok(())
     }
-    pub async fn update_clearing_price_info(&self, auction_id: u64, chain_id: u32) -> Result<()> {
+    pub async fn update_clearing_price_info(
+        &self,
+        mut the_graph_reader: &mut UniswapSubgraphClient,
+        auction_id: u64,
+        chain_id: u32,
+    ) -> Result<()> {
         let new_clearing_price = self.get_clearing_order_and_volume(auction_id).await;
         let decimals_auctioning_token;
         let decimals_bidding_token;
@@ -558,7 +571,7 @@ impl Orderbook {
             auction_id,
             new_clearing_price
                 .0
-                .to_price_point(decimals_auctioning_token, decimals_bidding_token)
+                .convert_to_price_point(decimals_auctioning_token, decimals_bidding_token)
                 .price,
         )
         .await?;
@@ -572,7 +585,7 @@ impl Orderbook {
         )
         .await?;
         self.update_interest_score(auction_id).await?;
-        self.update_usd_amount_traded_of_details(auction_id, chain_id)
+        self.update_usd_amount_traded_of_details(&mut the_graph_reader, auction_id, chain_id)
             .await?;
         Ok(())
     }
@@ -677,36 +690,56 @@ impl Orderbook {
     }
     pub async fn update_usd_amount_traded_of_details(
         &self,
+        the_graph_reader: &mut UniswapSubgraphClient,
         auction_id: u64,
         chain_id: u32,
     ) -> Result<()> {
-        let mut auction_details_hashmap = self.auction_details.write().await;
-        match auction_details_hashmap.entry(auction_id) {
-            Entry::Occupied(mut details) => {
-                let current_bidding_amount = details.get().current_bidding_amount as f64;
-                let auctioning_token = details.get().address_auctioning_token;
-                let bidding_token_address = details.get().address_bidding_token;
-                let empty_stable_coin_list: Vec<Address> = Vec::new();
-                let legit_stable_coins = LEGIT_STABLE_COINS
-                    .get(&chain_id)
-                    .unwrap_or(&empty_stable_coin_list);
-                if legit_stable_coins.contains(&bidding_token_address) {
-                    details.get_mut().usd_amount_traded = current_bidding_amount;
-                } else if legit_stable_coins.contains(&auctioning_token) {
-                    details.get_mut().usd_amount_traded =
-                        (current_bidding_amount) / (details.get().current_clearing_price as f64);
-                } else {
-                    details.get_mut().usd_amount_traded = 0f64;
+        let usd_amount;
+        {
+            let auction_details_hashmap = self.auction_details.read().await;
+            usd_amount = match auction_details_hashmap.get(&auction_id) {
+                Some(details) => {
+                    let current_bidding_amount = details.current_bidding_amount as f64;
+                    let auctioning_token = details.address_auctioning_token;
+                    let bidding_token_address = details.address_bidding_token;
+                    let empty_stable_coin_list: Vec<Address> = Vec::new();
+                    let legit_stable_coins = LEGIT_STABLE_COINS
+                        .get(&chain_id)
+                        .unwrap_or(&empty_stable_coin_list);
+                    let weth = PRICE_FEED_SUPPORTED_TOKENS
+                        .get(&chain_id)
+                        .unwrap_or(&empty_stable_coin_list);
+                    if legit_stable_coins.contains(&bidding_token_address) {
+                        current_bidding_amount
+                    } else if legit_stable_coins.contains(&auctioning_token) {
+                        (current_bidding_amount) / (details.current_clearing_price as f64)
+                    } else if weth.contains(&bidding_token_address) {
+                        let eth_price = the_graph_reader
+                            .get_eth_usd_price(details.end_time_timestamp)
+                            .await?;
+                        current_bidding_amount * eth_price
+                    } else {
+                        0f64
+                    }
                 }
+                None => 0f64,
+            };
+        }
+        {
+            let mut auction_details_hashmap = self.auction_details.write().await;
+            match auction_details_hashmap.entry(auction_id) {
+                Entry::Occupied(mut details) => {
+                    details.get_mut().usd_amount_traded = usd_amount;
+                }
+                Entry::Vacant(_) => {}
             }
-            Entry::Vacant(_) => {}
         }
         Ok(())
     }
 }
 
+#[cfg(test)]
 mod tests {
-    #[allow(unused_imports)]
     use super::*;
     #[allow(unused_imports)]
     use primitive_types::U256;

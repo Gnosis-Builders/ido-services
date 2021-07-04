@@ -340,7 +340,7 @@ pub mod test_util {
         assert_eq!(response.status(), StatusCode::OK);
         let response_details: Vec<AuctionDetailsForUser> =
             serde_json::from_slice(response.body()).unwrap();
-        assert_eq!(response_details.get(0).unwrap().has_participation, true);
+        assert!(response_details.get(0).unwrap().has_participation);
     }
 
     #[tokio::test]
