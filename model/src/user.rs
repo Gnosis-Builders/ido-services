@@ -1,4 +1,4 @@
-use primitive_types::H160;
+use ethcontract::H160;
 
 #[derive(Eq, PartialEq, Clone, Debug, Copy, Default)]
 pub struct User {

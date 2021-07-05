@@ -152,7 +152,7 @@ mod tests {
         );
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "current_thread")]
     #[ignore]
     async fn uniswap_price_subgraph_query() {
         let mut client = UniswapSubgraphClient::for_chain(1).unwrap();

@@ -2,13 +2,13 @@ use crate::event_reader::EventReader;
 use crate::subgraph::uniswap_graph_api::UniswapSubgraphClient;
 use anyhow::Result;
 use ethcontract::Address;
+use ethcontract::H160;
 use lazy_static::lazy_static;
 use maplit::hashmap;
 use model::auction_details::AuctionDetails;
 use model::order::TEN;
 use model::order::{Order, OrderWithAuctionId, OrderbookDisplay, PricePoint};
 use model::user::User;
-use primitive_types::H160;
 use primitive_types::U256;
 use std::collections::{hash_map::Entry, HashMap, HashSet};
 use std::str::FromStr;
@@ -744,7 +744,7 @@ mod tests {
     #[allow(unused_imports)]
     use primitive_types::U256;
 
-    #[tokio::test]
+    #[tokio::test(flavor = "current_thread")]
     async fn adds_order_to_orderbook() {
         let user_id = 10_u64;
         let order = Order {
@@ -768,7 +768,7 @@ mod tests {
         );
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "current_thread")]
     async fn sorts_orders_from_orderbook() {
         let order_1 = Order {
             sell_amount: U256::from_dec_str("1230").unwrap(),
@@ -794,7 +794,7 @@ mod tests {
             vec![order_2, order_1]
         );
     }
-    #[tokio::test]
+    #[tokio::test(flavor = "current_thread")]
     async fn get_clearing_order_and_price_() {
         let order_1 = Order {
             sell_amount: U256::from_dec_str("2").unwrap(),
@@ -834,7 +834,7 @@ mod tests {
         assert_eq!(result.0, order_1);
         assert_eq!(result.1, order_1.sell_amount);
     }
-    #[tokio::test]
+    #[tokio::test(flavor = "current_thread")]
     async fn get_clearing_order_and_price_2() {
         let order_1 = Order {
             sell_amount: U256::from_dec_str("500000000000000000000").unwrap(),
@@ -878,7 +878,7 @@ mod tests {
 
         assert_eq!(result.0, order_4);
     }
-    #[tokio::test]
+    #[tokio::test(flavor = "current_thread")]
     async fn get_previous_order() {
         let order_1 = Order {
             sell_amount: U256::from_dec_str("2").unwrap(),

@@ -2,14 +2,15 @@ use anyhow::Result;
 use contracts::EasyAuction;
 use ethabi::ParamType;
 use ethcontract::Address;
-use ethcontract::BlockNumber;
 use model::auction_details::AuctionDetails;
 use model::order::Order;
 use model::order::OrderWithAuctionId;
 use model::user::User;
-use primitive_types::{H160, U256};
+use primitive_types::H160;
+use primitive_types::U256;
 use std::convert::TryInto;
 use tracing::info;
+use web3::types::BlockNumber;
 use web3::Web3;
 
 pub struct EventReader {
@@ -293,22 +294,22 @@ impl EventReader {
     }
 }
 
-fn get_address_from_bytes(input: Vec<u8>) -> ethcontract::H160 {
-    if input.len() == 32 {
-        return ethabi::decode(&[ParamType::Address], &input)
-            .unwrap_or_else(|_| vec![ethabi::Token::Address(H160::zero())])
+fn get_address_from_bytes(input: ethcontract::Bytes<Vec<u8>>) -> primitive_types::H160 {
+    if input.0.len() == 32 {
+        return ethabi::decode(&[ParamType::Address], &input.0)
+            .unwrap_or_else(|_| vec![ethabi::Token::Address(primitive_types::H160::zero())])
             .get(0)
             .unwrap()
             .clone()
             .into_address()
             .unwrap();
-    } else if input.len() == 20 {
-        let vec_as_array: [u8; 20] = input.try_into().unwrap_or_else(|v: Vec<u8>| {
+    } else if input.0.len() == 20 {
+        let vec_as_array: [u8; 20] = input.0.try_into().unwrap_or_else(|v: Vec<u8>| {
             panic!("Expected a Vec of length {} but it was {}", 4, v.len())
         });
-        return ethcontract::H160::from(vec_as_array);
+        return primitive_types::H160::from(vec_as_array);
     }
-    ethcontract::H160::zero()
+    primitive_types::H160::zero()
 }
 
 #[cfg(test)]
@@ -318,9 +319,11 @@ mod tests {
 
     #[test]
     fn abi_decode_bytes() {
-        let vec_u8_short: Vec<u8> = hex!("740a98f8f4fae0986fb3264fe4aacf94ac1ee96f").to_vec();
-        let vec_u8_long: Vec<u8> =
-            hex!("000000000000000000000000740a98f8f4fae0986fb3264fe4aacf94ac1ee96f").to_vec();
+        let vec_u8_short =
+            ethcontract::Bytes(hex::decode("740a98f8f4fae0986fb3264fe4aacf94ac1ee96f").unwrap());
+        let vec_u8_long = ethcontract::Bytes(
+            hex!("000000000000000000000000740a98f8f4fae0986fb3264fe4aacf94ac1ee96f").to_vec(),
+        );
 
         let address_from_long: Address = get_address_from_bytes(vec_u8_long);
         let address_from_short: Address = get_address_from_bytes(vec_u8_short);

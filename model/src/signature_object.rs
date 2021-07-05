@@ -2,6 +2,7 @@ use super::Signature;
 use crate::DomainSeparator;
 use anyhow::Result;
 use ethcontract::Address;
+use primitive_types::H160;
 use serde::{Deserialize, Serialize};
 use web3::{
     signing::{self},
@@ -30,7 +31,7 @@ impl SignaturePackage {
         domain_separator: &DomainSeparator,
         user: Address,
         auction_id: u64,
-        signer: Address,
+        signer: H160,
     ) -> Result<bool> {
         let v = self.signature.v & 0x1f;
         let message = signing_digest_typed_data(domain_separator, user, auction_id);
@@ -119,7 +120,7 @@ mod tests {
 
     #[test]
     fn validate_input() {
-        let signer: Address = "0x740a98F8f4fAe0986FB3264Fe4aaCf94ac1EE96f"
+        let signer: H160 = "0x740a98F8f4fAe0986FB3264Fe4aaCf94ac1EE96f"
             .parse()
             .unwrap();
         let value = json!(

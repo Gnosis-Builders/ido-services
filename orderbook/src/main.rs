@@ -216,12 +216,12 @@ pub async fn orderbook_maintenance(
             tracing::debug!("Orderbook fully synced");
         }
         if fully_indexed_events {
-            tokio::time::delay_for(MAINTENANCE_INTERVAL).await;
+            tokio::time::sleep(MAINTENANCE_INTERVAL).await;
         }
     }
 }
 
-#[tokio::main]
+#[tokio::main(flavor = "multi_thread", worker_threads = 4)]
 async fn main() {
     let args = Arguments::from_args();
     tracing_setup::initialize(args.log_filter.as_str());

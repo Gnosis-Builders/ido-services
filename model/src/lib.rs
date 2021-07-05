@@ -6,7 +6,7 @@ pub mod user;
 use ethabi::{encode, Token};
 use hex::{FromHex, FromHexError};
 use lazy_static::lazy_static;
-use primitive_types::{H160, H256};
+use primitive_types::H256;
 use serde::{de, Deserialize, Serialize};
 use serde::{Deserializer, Serializer};
 use std::fmt::{Debug, Display, Formatter};
@@ -107,7 +107,7 @@ impl Debug for DomainSeparator {
 }
 
 impl DomainSeparator {
-    pub fn get_domain_separator(chain_id: u64, contract_address: H160) -> Self {
+    pub fn get_domain_separator(chain_id: u64, contract_address: primitive_types::H160) -> Self {
         lazy_static! {
             /// The EIP-712 domain name used for computing the domain separator.
             static ref DOMAIN_NAME: [u8; 32] = signing::keccak256(b"AccessManager");
@@ -136,7 +136,7 @@ impl DomainSeparator {
 mod tests {
     use super::*;
     use hex_literal::hex;
-
+    use primitive_types::H160;
     #[test]
     fn domain_separator_rinkeby() {
         let contract_address: H160 = hex!("ed52BE1b0071C2f27D10fCc06Ef2e0194cF4E18D").into();

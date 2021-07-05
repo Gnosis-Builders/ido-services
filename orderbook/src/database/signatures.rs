@@ -104,7 +104,7 @@ mod tests {
     use std::iter::FromIterator;
     use std::str::FromStr;
 
-    #[tokio::test]
+    #[tokio::test(flavor = "current_thread")]
     #[ignore]
     async fn postgres_insert_same_signature_does_not_fail_and_does_not_generate_duplicate() {
         let db = Database::new("postgresql://").unwrap();
@@ -144,7 +144,7 @@ mod tests {
         );
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "current_thread")]
     #[ignore]
     async fn postgres_signature_roundtrip() {
         let db = Database::new("postgresql://").unwrap();
@@ -176,7 +176,7 @@ mod tests {
             vec![signature]
         );
     }
-    #[tokio::test]
+    #[tokio::test(flavor = "current_thread")]
     #[ignore]
     async fn postgres_signature_roundtrip_with_3_sigs() {
         let db = Database::new("postgresql://").unwrap();
@@ -228,7 +228,7 @@ mod tests {
         let hashset_from_vec = HashSet::from_iter(vec![signature_1, signature_2, signature_3]);
         assert_eq!(hashset_from_result, hashset_from_vec);
     }
-    #[tokio::test]
+    #[tokio::test(flavor = "current_thread")]
     #[ignore]
     async fn postgres_signature_roundtrip_with_3_sigs_2_times_the_same() {
         let db = Database::new("postgresql://").unwrap();
@@ -274,7 +274,7 @@ mod tests {
         let hashset_from_vec = HashSet::from_iter(vec![signature_1, signature_2]);
         assert_eq!(hashset_from_result, hashset_from_vec);
     }
-    #[tokio::test]
+    #[tokio::test(flavor = "current_thread")]
     #[ignore]
     async fn postgres_signature_roundtrip_with_reinsert() {
         let db = Database::new("postgresql://").unwrap();
@@ -326,7 +326,7 @@ mod tests {
         assert_eq!(hashset_from_result, hashset_from_vec);
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "current_thread")]
     #[ignore]
     async fn postgres_get_all_signatures_roundtrip() {
         let db = Database::new("postgresql://").unwrap();
@@ -372,7 +372,7 @@ mod tests {
         let hashset_from_vec = HashSet::from_iter(vec![signature_1, signature_2]);
         assert_eq!(hashset_from_result, hashset_from_vec);
     }
-    #[tokio::test]
+    #[tokio::test(flavor = "current_thread")]
     #[ignore]
     async fn test_insert_signatures() {
         let db = Database::new("postgresql://").unwrap();
@@ -410,7 +410,7 @@ mod tests {
             .unwrap();
         assert_eq!(received_signature[0], signature)
     }
-    #[tokio::test]
+    #[tokio::test(flavor = "current_thread")]
     #[ignore]
     async fn test_duplicate_err_() {
         let db = Database::new("postgresql://").unwrap();

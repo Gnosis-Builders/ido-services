@@ -14,7 +14,7 @@ use std::{
     time::{Duration, Instant, SystemTime},
 };
 
-#[tokio::main]
+#[tokio::main(flavor = "current_thread")]
 async fn main() {
     env_logger::init_from_env(Env::default().default_filter_or("warn,deploy=info"));
 

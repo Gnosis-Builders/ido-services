@@ -168,7 +168,7 @@ pub mod test_util {
     use serde_json::json;
     use warp::{http::StatusCode, test::request};
 
-    #[tokio::test]
+    #[tokio::test(flavor = "current_thread")]
     async fn get_previous_order_() {
         let orderbook = Orderbook::default();
         let auction_id: u64 = 1;
@@ -198,7 +198,7 @@ pub mod test_util {
         assert_eq!(response_order, order_1);
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "current_thread")]
     async fn get_user_orders_() {
         let orderbook = Orderbook::default();
         let auction_id: u64 = 1;
@@ -247,7 +247,7 @@ pub mod test_util {
         assert_eq!(response_order, vec![order_1]);
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "current_thread")]
     async fn get_user_orders_without_canceled_or_claimed_() {
         let orderbook = Orderbook::default();
         let auction_id: u64 = 1;
@@ -297,7 +297,7 @@ pub mod test_util {
         let response_order: Vec<Order> = serde_json::from_slice(response.body()).unwrap();
         assert_eq!(response_order, vec![order_1]);
     }
-    #[tokio::test]
+    #[tokio::test(flavor = "current_thread")]
     async fn get_auction_details_for_user_() {
         let orderbook = Orderbook::default();
         let auction_id: u64 = 1;
@@ -343,7 +343,7 @@ pub mod test_util {
         assert!(response_details.get(0).unwrap().has_participation);
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "current_thread")]
     #[ignore]
     async fn get_signature_() {
         let auction_id: u64 = 15;
@@ -385,7 +385,7 @@ pub mod test_util {
         let response_sig: Signature = serde_json::from_slice(response.body()).unwrap();
         assert_eq!(response_sig, signature);
     }
-    #[tokio::test]
+    #[tokio::test(flavor = "current_thread")]
     #[ignore]
     async fn provide_new_signatures() {
         let orderbook = Orderbook::default();

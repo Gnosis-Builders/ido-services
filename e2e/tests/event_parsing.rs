@@ -14,7 +14,7 @@ mod ganache;
 const API_HOST: &str = "http://127.0.0.1:8080";
 const ORDERBOOK_DISPLAY_ENDPOINT: &str = "/api/v1/get_order_book_display_data/";
 
-#[tokio::test]
+#[tokio::test(flavor = "current_thread")]
 async fn event_parsing() {
     ganache::test(|web3| async {
         tracing_setup::initialize("debug");
@@ -89,7 +89,7 @@ async fn event_parsing() {
                 U256::from_str("1").unwrap(),
                 false,
                 Address::zero(),
-                Vec::new(),
+                ethcontract::Bytes(Vec::new()),
             )
         );
         // Place Order
@@ -109,8 +109,8 @@ async fn event_parsing() {
                 auction_id,
                 vec![(10_u128).checked_pow(18).unwrap()],
                 vec![(10_u128).checked_pow(18).unwrap().checked_mul(2).unwrap()],
-                vec![queue_start_as_hex],
-                vec![0u8],
+                vec![ethcontract::Bytes(queue_start_as_hex)],
+                ethcontract::Bytes(vec![0u8]),
             )
         );
 
