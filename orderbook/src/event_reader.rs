@@ -144,7 +144,7 @@ impl EventReader {
                 end_time_timestamp: event.data.auction_end_date.as_u64(),
                 starting_timestamp: event_timestamp.unwrap_or(0_u64),
                 current_clearing_price: price_point.price,
-                current_bidding_amount: 0_u64,
+                current_bidding_amount: U256::zero(),
                 is_private_auction,
                 is_atomic_closure_allowed,
                 chain_id: *chain_id,

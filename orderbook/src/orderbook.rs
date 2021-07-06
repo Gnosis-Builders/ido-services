@@ -575,15 +575,8 @@ impl Orderbook {
                 .price,
         )
         .await?;
-        self.update_current_bidding_amount_of_details(
-            auction_id,
-            new_clearing_price
-                .2
-                .checked_div(TEN.pow(decimals_bidding_token))
-                .unwrap()
-                .as_u64(),
-        )
-        .await?;
+        self.update_current_bidding_amount_of_details(auction_id, new_clearing_price.2)
+            .await?;
         self.update_interest_score(auction_id).await?;
         self.update_usd_amount_traded_of_details(&mut the_graph_reader, auction_id, chain_id)
             .await?;
@@ -667,7 +660,7 @@ impl Orderbook {
     pub async fn update_current_bidding_amount_of_details(
         &self,
         auction_id: u64,
-        amount: u64,
+        amount: U256,
     ) -> Result<()> {
         let mut auction_details_hashmap = self.auction_details.write().await;
         match auction_details_hashmap.entry(auction_id) {
@@ -682,7 +675,9 @@ impl Orderbook {
         let mut auction_details_hashmap = self.auction_details.write().await;
         match auction_details_hashmap.entry(auction_id) {
             Entry::Occupied(mut details) => {
-                details.get_mut().interest_score = details.get().current_bidding_amount as f64;
+                details.get_mut().interest_score = details.get().current_bidding_amount.as_u128()
+                    as f64
+                    / (TEN.pow(details.get().decimals_bidding_token)).as_u128() as f64;
             }
             Entry::Vacant(_) => {}
         }
@@ -699,7 +694,8 @@ impl Orderbook {
             let auction_details_hashmap = self.auction_details.read().await;
             usd_amount = match auction_details_hashmap.get(&auction_id) {
                 Some(details) => {
-                    let current_bidding_amount = details.current_bidding_amount as f64;
+                    let current_bidding_amount = details.current_bidding_amount.as_u128() as f64
+                        / TEN.pow(details.decimals_bidding_token).as_u128() as f64;
                     let auctioning_token = details.address_auctioning_token;
                     let bidding_token_address = details.address_bidding_token;
                     let empty_stable_coin_list: Vec<Address> = Vec::new();
