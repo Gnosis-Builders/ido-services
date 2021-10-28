@@ -3,6 +3,7 @@ use crate::database::Database;
 use crate::database::SignatureFilter;
 use crate::health::HttpHealthEndpoint;
 use crate::orderbook::Orderbook;
+use futures::future::join_all;
 use futures::TryStreamExt;
 use model::auction_details::AuctionDetails;
 use model::order::Order;
@@ -106,13 +107,24 @@ pub async fn provide_signatures(
         signature_object.chain_id,
         signature_object.allow_list_contract,
     );
-    for signature_pair in signature_object.signatures.clone() {
-        let signature_ok = signature_pair.validate_signature(
-            &domain_separator_of_call,
-            signature_pair.user,
-            signature_object.auction_id,
-            event_details.allow_list_signer,
-        );
+    let future_results = join_all(signature_object.signatures.iter().map(|signature_pair| {
+        let allow_list_signer = event_details.allow_list_signer;
+        let auction_id = signature_object.auction_id;
+        async move {
+            (
+                signature_pair.clone(),
+                signature_pair.validate_signature(
+                    &domain_separator_of_call,
+                    signature_pair.user,
+                    auction_id,
+                    allow_list_signer,
+                ),
+            )
+        }
+    }))
+    .await;
+
+    for (signature_pair, signature_ok) in future_results {
         if let Err(err) = signature_ok {
             return Ok(with_status(
                 json(&format!(
