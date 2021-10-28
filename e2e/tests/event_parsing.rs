@@ -116,7 +116,7 @@ async fn event_parsing() {
 
         // serve task
         let orderbook = Arc::new(Orderbook::new());
-        let database = Database::new(&"postgresql://").expect("failed to create database");
+        let database = Database::new("postgresql://").expect("failed to create database");
         database.clear().await.unwrap();
         let health = Arc::new(HttpHealthEndpoint::new());
         orderbook::serve_task(

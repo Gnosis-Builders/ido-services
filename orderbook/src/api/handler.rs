@@ -183,7 +183,16 @@ pub async fn get_clearing_order_and_volume(
     orderbook: Arc<Orderbook>,
 ) -> Result<impl warp::Reply, Infallible> {
     let order = orderbook.get_clearing_order_and_volume(auction_id).await;
-    Ok(with_status(json(&order), StatusCode::OK))
+    match order {
+        Ok(order) => Ok(with_status(json(&order), StatusCode::OK)),
+        Err(err) => Ok(with_status(
+            json(&format!(
+                "Errors: {:?} while calculating the clearing price ",
+                err
+            )),
+            StatusCode::BAD_REQUEST,
+        )),
+    }
 }
 
 pub async fn get_order_book_display_data(

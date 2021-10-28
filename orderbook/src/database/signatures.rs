@@ -36,7 +36,7 @@ impl Database {
         }
         // removing last comma:
         query = query[..(query.len() - 1)].to_string();
-        query.push_str(&"ON CONFLICT (auction_id, user_address) DO NOTHING;");
+        query.push_str("ON CONFLICT (auction_id, user_address) DO NOTHING;");
         let result = sqlx::query(&query).execute(&self.pool).await;
         match result {
             Ok(_) => Ok(()),

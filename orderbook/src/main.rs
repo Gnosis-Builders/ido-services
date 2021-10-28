@@ -38,7 +38,7 @@ struct Arguments {
     #[structopt(
         long,
         env = "NODE_URL",
-        default_value = "https://dev-openethereum.rinkeby.gnosisdev.com"
+        default_value = "https://staging-openethereum.rinkeby.gnosisdev.com"
     )]
     pub node_url: Url,
 
@@ -95,13 +95,13 @@ pub async fn orderbook_maintenance(
         )
         .await
         .unwrap();
-    let mut last_block_considered_for_reorg_protected_orderbook = 0u64;
-    match tx_info {
-        Some(tx) => {
-            last_block_considered_for_reorg_protected_orderbook = tx.block_number.unwrap().as_u64()
+    let mut last_block_considered_for_reorg_protected_orderbook = match tx_info {
+        Some(tx) => tx.block_number.unwrap().as_u64(),
+        None => {
+            tracing::error!("Deployment block was not found");
+            0u64
         }
-        None => tracing::error!("Deployment block was not found"),
-    }
+    };
 
     let mut fully_indexed_events = false;
     loop {
@@ -116,92 +116,69 @@ pub async fn orderbook_maintenance(
             )
             .await
             .expect("maintenance function not successful");
-        // most ridiculous swap: Resetting the orderbook_latest to orderbook_protected
+
+        let current_block = event_reader
+            .web3
+            .eth()
+            .block_number()
+            .await
+            .unwrap_or_else(|_| web3::types::U64::zero())
+            .as_u64();
+        let mut last_block_considered = last_block_considered_for_reorg_protected_orderbook; // Values are cloned, as we don't wanna store the values.
+
         {
-            {
-                let mut orderbook = orderbook_latest.orders.write().await;
-                let orderbook_reorg_save = orderbook_reorg_protected.orders.read().await;
-                orderbook.retain(|&k, _| k == 0);
-                for auction_id in orderbook_reorg_save.keys() {
-                    orderbook.insert(
-                        *auction_id,
-                        orderbook_reorg_save.get(auction_id).unwrap().clone(),
-                    );
-                }
-            }
-            {
-                let mut orderbook = orderbook_latest.orders_display.write().await;
-                let orderbook_reorg_save = orderbook_reorg_protected.orders_display.read().await;
-                orderbook.retain(|&k, _| k == 0);
-                for auction_id in orderbook_reorg_save.keys() {
-                    orderbook.insert(
-                        *auction_id,
-                        orderbook_reorg_save.get(auction_id).unwrap().clone(),
-                    );
-                }
-            }
-            {
-                let mut orderbook = orderbook_latest.orders_without_claimed.write().await;
-                let orderbook_reorg_save = orderbook_reorg_protected
-                    .orders_without_claimed
-                    .read()
-                    .await;
-                orderbook.retain(|&k, _| k == 0);
-                for auction_id in orderbook_reorg_save.keys() {
-                    orderbook.insert(
-                        *auction_id,
-                        orderbook_reorg_save.get(auction_id).unwrap().clone(),
-                    );
-                }
-            }
-            {
-                let mut orderbook = orderbook_latest.auction_details.write().await;
-                let orderbook_reorg_save = orderbook_reorg_protected.auction_details.read().await;
-                orderbook.retain(|&k, _| k == 0);
-                for auction_id in orderbook_reorg_save.keys() {
-                    orderbook.insert(
-                        *auction_id,
-                        orderbook_reorg_save.get(auction_id).unwrap().clone(),
-                    );
-                }
-            }
-            {
-                let mut users = orderbook_latest.users.write().await;
-                let users_reorg_save = orderbook_reorg_protected.users.read().await;
-                users.retain(|&k, _| k == H160::zero());
-                for address in users_reorg_save.keys() {
-                    users.insert(*address, *users_reorg_save.get(address).unwrap());
-                }
-            }
-            {
-                let mut auction_participation =
-                    orderbook_latest.auction_participation.write().await;
-                let auction_participation_reorg_save =
-                    orderbook_reorg_protected.auction_participation.read().await;
-                auction_participation.retain(|&k, _| k == 0);
-                for user_ids in auction_participation_reorg_save.keys() {
-                    auction_participation.insert(
-                        *user_ids,
-                        auction_participation_reorg_save
-                            .get(user_ids)
-                            .unwrap()
-                            .clone(),
-                    );
-                }
+            let mut orderbook = orderbook_latest.orders.write().await;
+            let orderbook_reorg_save = orderbook_reorg_protected.orders.read().await;
+            *orderbook = orderbook_reorg_save.clone();
+        }
+        {
+            let mut orderbook = orderbook_latest.orders_display.write().await;
+            let orderbook_reorg_save = orderbook_reorg_protected.orders_display.read().await;
+            *orderbook = orderbook_reorg_save.clone();
+        }
+        {
+            let mut orderbook = orderbook_latest.orders_without_claimed.write().await;
+            let orderbook_reorg_save = orderbook_reorg_protected
+                .orders_without_claimed
+                .read()
+                .await;
+            *orderbook = orderbook_reorg_save.clone();
+        }
+        {
+            let mut orderbook = orderbook_latest.auction_details.write().await;
+            let orderbook_reorg_save = orderbook_reorg_protected.auction_details.read().await;
+            *orderbook = orderbook_reorg_save.clone();
+        }
+        {
+            let mut users = orderbook_latest.users.write().await;
+            let users_reorg_save = orderbook_reorg_protected.users.read().await;
+            users.retain(|&k, _| k == H160::zero());
+            for address in users_reorg_save.keys() {
+                users.insert(*address, *users_reorg_save.get(address).unwrap());
             }
         }
-        let mut last_block_considered = last_block_considered_for_reorg_protected_orderbook; // Values are cloned, as we don't wanna store the values.
-        orderbook_latest
-            .run_maintenance(
-                &event_reader,
-                &mut the_graph_reader,
-                &mut last_block_considered,
-                false,
-                chain_id.as_u32(),
-            )
-            .await
-            .expect("maintenance function not successful");
-
+        {
+            let mut auction_participation = orderbook_latest.auction_participation.write().await;
+            let auction_participation_reorg_save =
+                orderbook_reorg_protected.auction_participation.read().await;
+            *auction_participation = auction_participation_reorg_save.clone();
+        }
+        // Only look forward without reorg protection, in case the sync process is close to the top of the chain.
+        if last_block_considered_for_reorg_protected_orderbook
+            + 2 * event_reader.number_of_blocks_to_sync_per_request
+            > current_block
+        {
+            orderbook_latest
+                .run_maintenance(
+                    &event_reader,
+                    &mut the_graph_reader,
+                    &mut last_block_considered,
+                    false,
+                    chain_id.as_u32(),
+                )
+                .await
+                .expect("maintenance function not successful");
+        }
         let current_block = event_reader
             .web3
             .eth()

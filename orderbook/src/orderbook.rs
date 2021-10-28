@@ -1,6 +1,6 @@
 use crate::event_reader::EventReader;
 use crate::subgraph::uniswap_graph_api::UniswapSubgraphClient;
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use ethcontract::Address;
 use ethcontract::H160;
 use lazy_static::lazy_static;
@@ -329,7 +329,10 @@ impl Orderbook {
             .copied()
             .collect()
     }
-    pub async fn get_clearing_order_and_volume(&self, auction_id: u64) -> (Order, U256, U256) {
+    pub async fn get_clearing_order_and_volume(
+        &self,
+        auction_id: u64,
+    ) -> Result<(Order, U256, U256)> {
         // code is one to one copy of smart contract, hence no extensive testing
         let orders = self.get_orders(auction_id).await;
         let initial_order = self.get_initial_order(auction_id).await;
@@ -338,14 +341,16 @@ impl Orderbook {
 
         for order in orders {
             current_order = order;
-            current_bid_sum = current_bid_sum.checked_add(order.sell_amount).unwrap();
+            current_bid_sum = current_bid_sum
+                .checked_add(order.sell_amount)
+                .ok_or_else(|| anyhow!("error in get_clearing_price_calculation"))?;
             if current_bid_sum
                 .checked_mul(order.buy_amount)
-                .unwrap()
+                .ok_or_else(|| anyhow!("error in get_clearing_price_calculation"))?
                 .ge(&initial_order
                     .sell_amount
                     .checked_mul(order.sell_amount)
-                    .unwrap())
+                    .ok_or_else(|| anyhow!("error in get_clearing_price_calculation"))?)
             {
                 break;
             }
@@ -353,36 +358,36 @@ impl Orderbook {
         if current_bid_sum.gt(&U256::zero())
             && current_bid_sum
                 .checked_mul(current_order.buy_amount)
-                .unwrap()
+                .ok_or_else(|| anyhow!("error in get_clearing_price_calculation"))?
                 .ge(&initial_order
                     .sell_amount
                     .checked_mul(current_order.sell_amount)
-                    .unwrap())
+                    .ok_or_else(|| anyhow!("error in get_clearing_price_calculation"))?)
         {
             let uncovered_bids = current_bid_sum
                 .checked_sub(
                     initial_order
                         .sell_amount
                         .checked_mul(current_order.sell_amount)
-                        .unwrap()
+                        .ok_or_else(|| anyhow!("error in get_clearing_price_calculation"))?
                         .checked_div(current_order.buy_amount)
-                        .unwrap(),
+                        .ok_or_else(|| anyhow!("error in get_clearing_price_calculation"))?,
                 )
-                .unwrap();
+                .ok_or_else(|| anyhow!("error in get_clearing_price_calculation"))?;
             if current_order.sell_amount.ge(&uncovered_bids) {
                 let sell_amount_clearing_order = current_order
                     .sell_amount
                     .checked_sub(uncovered_bids)
-                    .unwrap();
-                (
+                    .ok_or_else(|| anyhow!("error in get_clearing_price_calculation"))?;
+                Ok((
                     current_order,
                     sell_amount_clearing_order,
                     current_bid_sum
                         .checked_sub(current_order.sell_amount)
-                        .unwrap()
+                        .ok_or_else(|| anyhow!("error in get_clearing_price_calculation"))?
                         .checked_add(sell_amount_clearing_order)
-                        .unwrap(),
-                )
+                        .ok_or_else(|| anyhow!("error in get_clearing_price_calculation"))?,
+                ))
             } else {
                 let clearing_order = Order {
                     sell_amount: current_bid_sum
@@ -391,13 +396,13 @@ impl Orderbook {
                     buy_amount: initial_order.sell_amount,
                     user_id: 0_u64,
                 };
-                (
+                Ok((
                     clearing_order,
                     U256::zero(),
                     current_bid_sum
                         .checked_sub(current_order.sell_amount)
-                        .unwrap(),
-                )
+                        .ok_or_else(|| anyhow!("error in get_clearing_price_calculation"))?,
+                ))
             }
         } else if current_bid_sum.gt(&initial_order.buy_amount) {
             let clearing_order = Order {
@@ -405,7 +410,7 @@ impl Orderbook {
                 sell_amount: current_bid_sum,
                 user_id: 0_u64,
             };
-            (clearing_order, U256::zero(), current_bid_sum)
+            Ok((clearing_order, U256::zero(), current_bid_sum))
         } else {
             let clearing_order = Order {
                 buy_amount: initial_order.sell_amount,
@@ -414,10 +419,10 @@ impl Orderbook {
             };
             let clearing_volume = current_bid_sum
                 .checked_mul(initial_order.sell_amount)
-                .unwrap()
+                .ok_or_else(|| anyhow!("error in get_clearing_price_calculation"))?
                 .checked_div(initial_order.buy_amount)
-                .unwrap();
-            (clearing_order, clearing_volume, current_bid_sum)
+                .ok_or_else(|| anyhow!("error in get_clearing_price_calculation"))?;
+            Ok((clearing_order, clearing_volume, current_bid_sum))
         }
     }
     pub async fn get_previous_order(&self, auction_id: u64, order: Order) -> Order {
@@ -473,7 +478,10 @@ impl Orderbook {
         }
 
         let new_auctions: Vec<AuctionDetails>;
-        match event_reader.get_auction_updates(from_block, to_block).await {
+        match event_reader
+            .get_auction_updates(from_block, to_block, chain_id)
+            .await
+        {
             Ok(auction_updates) => {
                 new_auctions = auction_updates;
             }
@@ -540,7 +548,11 @@ impl Orderbook {
                 .update_clearing_price_info(&mut the_graph_reader, auction_id, chain_id)
                 .await
             {
-                tracing::debug!("error while calculating the clearing price: {:}", err)
+                tracing::debug!(
+                    "error while calculating the clearing price: {:} for auction id {:}",
+                    err,
+                    auction_id
+                )
             };
         }
         *last_block_considered = to_block;
@@ -552,7 +564,7 @@ impl Orderbook {
         auction_id: u64,
         chain_id: u32,
     ) -> Result<()> {
-        let new_clearing_price = self.get_clearing_order_and_volume(auction_id).await;
+        let new_clearing_price = self.get_clearing_order_and_volume(auction_id).await?;
         let decimals_auctioning_token;
         let decimals_bidding_token;
         {
@@ -589,7 +601,7 @@ impl Orderbook {
         let auction_details_hashmap = self.auction_details.read().await;
         let mut non_closed_auctions: Vec<AuctionDetails> = Vec::new();
         for auction_id in auction_details_hashmap.keys() {
-            let auction_details = auction_details_hashmap.get(&auction_id).unwrap();
+            let auction_details = auction_details_hashmap.get(auction_id).unwrap();
             if auction_details.end_time_timestamp
                 > SystemTime::now()
                     .duration_since(SystemTime::UNIX_EPOCH)
@@ -613,7 +625,7 @@ impl Orderbook {
         let auction_details_hashmap = self.auction_details.read().await;
         let mut closed_auctions: Vec<AuctionDetails> = Vec::new();
         for auction_id in auction_details_hashmap.keys() {
-            let auction_details = auction_details_hashmap.get(&auction_id).unwrap();
+            let auction_details = auction_details_hashmap.get(auction_id).unwrap();
             if auction_details.end_time_timestamp
                 < SystemTime::now()
                     .duration_since(SystemTime::UNIX_EPOCH)
@@ -638,7 +650,7 @@ impl Orderbook {
         let auction_details_hashmap = self.auction_details.read().await;
         let mut auction_detail_list: Vec<AuctionDetails> = Vec::new();
         for auction_id in auction_details_hashmap.keys() {
-            let auction_details = auction_details_hashmap.get(&auction_id).unwrap();
+            let auction_details = auction_details_hashmap.get(auction_id).unwrap();
             auction_detail_list.push(auction_details.clone());
         }
         Ok(auction_detail_list)
@@ -825,7 +837,10 @@ mod tests {
             .update_initial_order(auction_id, initial_order)
             .await;
         orderbook.sort_orders(auction_id).await;
-        let result = orderbook.get_clearing_order_and_volume(auction_id).await;
+        let result = orderbook
+            .get_clearing_order_and_volume(auction_id)
+            .await
+            .unwrap();
 
         assert_eq!(result.0, order_1);
         assert_eq!(result.1, order_1.sell_amount);
@@ -870,7 +885,10 @@ mod tests {
             .update_initial_order(auction_id, initial_order)
             .await;
         orderbook.sort_orders(auction_id).await;
-        let result = orderbook.get_clearing_order_and_volume(auction_id).await;
+        let result = orderbook
+            .get_clearing_order_and_volume(auction_id)
+            .await
+            .unwrap();
 
         assert_eq!(result.0, order_4);
     }

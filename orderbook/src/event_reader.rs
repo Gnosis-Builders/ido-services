@@ -72,6 +72,7 @@ impl EventReader {
         &self,
         from_block: u64,
         to_block: u64,
+        chain_id: u32,
     ) -> Result<Vec<AuctionDetails>> {
         let mut new_auction = Vec::new();
         let events = self
@@ -125,7 +126,6 @@ impl EventReader {
             if event.data.allow_list_contract == H160::from([0u8; 20]) {
                 is_private_auction = false;
             }
-            let chain_id = &self.web3.eth().chain_id().await?;
             new_auction.push(AuctionDetails {
                 auction_id: event.data.auction_id.as_u64(),
                 order: price_point,
@@ -147,7 +147,7 @@ impl EventReader {
                 current_bidding_amount: U256::zero(),
                 is_private_auction,
                 is_atomic_closure_allowed,
-                chain_id: *chain_id,
+                chain_id: U256::from(chain_id),
                 interest_score: 0_f64,
                 usd_amount_traded: 0_f64,
             });
