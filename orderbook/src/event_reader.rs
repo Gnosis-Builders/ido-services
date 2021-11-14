@@ -106,13 +106,13 @@ impl EventReader {
             let bidding_erc20_contract = contracts::ERC20::at(&self.web3, address_bidding_token);
             let auctioning_erc20_contract =
                 contracts::ERC20::at(&self.web3, address_auctioning_token);
-            let symbol_auctioning_token = auctioning_erc20_contract.symbol().call().await?;
             let auction_details_from_rpc_call = self
                 .contract
                 .auction_data(event.data.auction_id)
                 .call()
                 .await?;
             let is_atomic_closure_allowed = auction_details_from_rpc_call.11;
+            let symbol_auctioning_token = auctioning_erc20_contract.symbol().call().await?;
             let decimals_auctioning_token =
                 U256::from(auctioning_erc20_contract.decimals().call().await?);
             let symbol_bidding_token = bidding_erc20_contract.symbol().call().await?;
@@ -237,12 +237,12 @@ impl EventReader {
         Ok(users)
     }
 
-    pub async fn get_to_block(
+    pub fn get_to_block(
         &self,
         last_handled_block: u64,
         reorg_protection: bool,
+        current_block: u64,
     ) -> Result<(u64, u64)> {
-        let current_block = self.web3.eth().block_number().await?.as_u64();
         let mut to_block = current_block;
         if reorg_protection {
             to_block -= BLOCK_CONFIRMATION_COUNT;

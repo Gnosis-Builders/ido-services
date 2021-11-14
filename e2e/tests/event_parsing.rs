@@ -128,7 +128,13 @@ async fn event_parsing() {
         let event_reader = EventReader::new(easy_auction, web3, 100u64);
         let mut last_block_considered = 1u64;
         let mut the_graph_reader = UniswapSubgraphClient::for_chain(1).unwrap();
-
+        let current_block = event_reader
+            .web3
+            .eth()
+            .block_number()
+            .await
+            .unwrap_or_else(|_| web3::types::U64::zero())
+            .as_u64();
         orderbook::orderbook::Orderbook::run_maintenance(
             &orderbook,
             &event_reader,
@@ -136,6 +142,7 @@ async fn event_parsing() {
             &mut last_block_considered,
             false,
             chain_id.as_u32(),
+            current_block,
         )
         .await
         .unwrap();
@@ -168,6 +175,7 @@ async fn event_parsing() {
             &mut last_block_considered,
             false,
             chain_id.as_u32(),
+            current_block,
         )
         .await
         .unwrap();

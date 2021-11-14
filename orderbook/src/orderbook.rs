@@ -458,12 +458,10 @@ impl Orderbook {
         last_block_considered: &mut u64,
         reorg_protection: bool,
         chain_id: u32,
+        current_block: u64,
     ) -> Result<()> {
         let (from_block, to_block);
-        match event_reader
-            .get_to_block(*last_block_considered, reorg_protection)
-            .await
-        {
+        match event_reader.get_to_block(*last_block_considered, reorg_protection, current_block) {
             Ok(return_data) => {
                 from_block = return_data.0;
                 to_block = return_data.1

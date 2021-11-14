@@ -104,6 +104,13 @@ pub async fn orderbook_maintenance(
     };
 
     let mut fully_indexed_events = false;
+    let mut current_block = event_reader
+        .web3
+        .eth()
+        .block_number()
+        .await
+        .unwrap_or_else(|_| web3::types::U64::zero())
+        .as_u64();
     loop {
         tracing::debug!("running order book maintenance with reorg protection");
         orderbook_reorg_protected
@@ -113,17 +120,11 @@ pub async fn orderbook_maintenance(
                 &mut last_block_considered_for_reorg_protected_orderbook,
                 true,
                 chain_id.as_u32(),
+                current_block,
             )
             .await
             .expect("maintenance function not successful");
 
-        let current_block = event_reader
-            .web3
-            .eth()
-            .block_number()
-            .await
-            .unwrap_or_else(|_| web3::types::U64::zero())
-            .as_u64();
         let mut last_block_considered = last_block_considered_for_reorg_protected_orderbook; // Values are cloned, as we don't wanna store the values.
 
         {
@@ -164,6 +165,13 @@ pub async fn orderbook_maintenance(
             *auction_participation = auction_participation_reorg_save.clone();
         }
         // Only look forward without reorg protection, in case the sync process is close to the top of the chain.
+        current_block = event_reader
+            .web3
+            .eth()
+            .block_number()
+            .await
+            .unwrap_or_else(|_| web3::types::U64::zero())
+            .as_u64();
         if last_block_considered_for_reorg_protected_orderbook
             + 2 * event_reader.number_of_blocks_to_sync_per_request
             > current_block
@@ -175,17 +183,11 @@ pub async fn orderbook_maintenance(
                     &mut last_block_considered,
                     false,
                     chain_id.as_u32(),
+                    current_block,
                 )
                 .await
                 .expect("maintenance function not successful");
         }
-        let current_block = event_reader
-            .web3
-            .eth()
-            .block_number()
-            .await
-            .unwrap_or_else(|_| web3::types::U64::zero())
-            .as_u64();
 
         if current_block == last_block_considered {
             health.notify_ready();
