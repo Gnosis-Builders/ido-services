@@ -58,9 +58,17 @@ struct Arguments {
                 parse(try_from_str = duration_from_seconds),
             )]
     pub node_timeout: Duration,
+
+    /// Maintance intervall
+    #[structopt(
+        long,
+        env = "MAINTENANCE_INTERVAL",
+        default_value = "3",
+        parse(try_from_str = duration_from_seconds),
+    )]
+    pub maintance_interval: Duration,
 }
 
-const MAINTENANCE_INTERVAL: Duration = Duration::from_secs(3);
 // Todo: duplication from build file.
 lazy_static! {
     pub static ref EASY_AUCTION_DEPLOYMENT_INFO: HashMap::<u32, (Address, Option<H256>)> = hashmap! {
@@ -77,6 +85,7 @@ pub async fn orderbook_maintenance(
     event_reader: EventReader,
     mut the_graph_reader: UniswapSubgraphClient,
     health: Arc<HttpHealthEndpoint>,
+    maintance_interval: Duration,
 ) -> ! {
     // First block considered for synchronization should be the one, in which the deployment
     // of Gnosis Auction contract happens
@@ -195,7 +204,7 @@ pub async fn orderbook_maintenance(
             tracing::debug!("Orderbook fully synced");
         }
         if fully_indexed_events {
-            tokio::time::sleep(MAINTENANCE_INTERVAL).await;
+            tokio::time::sleep(maintance_interval).await;
         }
     }
 }
@@ -233,6 +242,7 @@ async fn main() {
         event_reader,
         the_graph_reader,
         health,
+        args.maintance_interval,
     ));
     tokio::select! {
         result = serve_task => tracing::error!(?result, "serve task exited"),
