@@ -32,7 +32,7 @@ pub struct DataFromEvent {
     pub timestamp: u64,
 }
 
-const BLOCK_CONFIRMATION_COUNT: u64 = 10;
+const BLOCK_CONFIRMATION_COUNT: u64 = 6;
 
 impl EventReader {
     pub fn new(
