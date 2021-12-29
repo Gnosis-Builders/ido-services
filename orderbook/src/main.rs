@@ -50,15 +50,6 @@ struct Arguments {
     )]
     pub number_of_blocks_to_sync_per_request: u64,
 
-    /// Timeout for web3 operations on the node in seconds.
-    #[structopt(
-                long,
-                env = "NODE_TIMEOUT",
-                default_value = "5",
-                parse(try_from_str = duration_from_seconds),
-            )]
-    pub node_timeout: Duration,
-
     /// Maintance intervall
     #[structopt(
         long,
@@ -76,6 +67,7 @@ lazy_static! {
         4 => (Address::from_str("C5992c0e0A3267C7F75493D0F717201E26BE35f7").unwrap(), Some("0xbdd1dde815a908d407ec89fa9bc317d9e33621ccc6452ac0eb00fe2ed0d81ff4".parse().unwrap())),
         100 => (Address::from_str("0b7fFc1f4AD541A4Ed16b40D8c37f0929158D101").unwrap(), Some("0x5af5443ba9add113a42b0219ac8f398c383dc5a3684a221fd24c5655b8316931".parse().unwrap())),
         137 => (Address::from_str("0b7fFc1f4AD541A4Ed16b40D8c37f0929158D101").unwrap(), Some("0x6093f70c46350202181e9b0edfcf8f0e966ddddeb8b24e8b73dd2ab636c1ce87".parse().unwrap())),
+        43114 => (Address::from_str("0xb5D00F83680ea5E078e911995c64b43Fbfd1eE61").unwrap(), Some("0xa6fa39783a488c892f28ce75ec2d8d079fb8d7ac4647c09bed9755e4246fd390".parse().unwrap())),
     };
 }
 

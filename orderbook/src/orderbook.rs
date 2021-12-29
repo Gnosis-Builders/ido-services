@@ -30,6 +30,7 @@ lazy_static! {
         4 => vec![Address::from_str("0x5592EC0cfb4dbc12D3aB100b257153436a1f0FEa").unwrap(),Address::from_str("0x4DBCdF9B62e891a7cec5A2568C3F4FAF9E8Abe2b").unwrap()],
         100 => vec![Address::from_str("0xe91D153E0b41518A2Ce8Dd3D7944Fa863463a97d").unwrap()],
         137 => vec![Address::from_str("0x8f3Cf7ad23Cd3CaDbD9735AFf958023239c6A063").unwrap(), Address::from_str("0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174").unwrap()],
+        43114 => vec![Address::from_str("0xA7D7079b0FEaD91F3e65f86E8915Cb59c1a4C664").unwrap(), Address::from_str("0xB97EF9Ef8734C71904D8002F8b6Bc66Dd9c48a6E").unwrap()],
     };
     pub static ref PRICE_FEED_SUPPORTED_TOKENS: HashMap::<u32, Vec<Address>> = hashmap! {
      1 => vec![Address::from_str("0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2").unwrap()],
@@ -454,7 +455,7 @@ impl Orderbook {
     pub async fn run_maintenance(
         &self,
         event_reader: &EventReader,
-        mut the_graph_reader: &mut UniswapSubgraphClient,
+        the_graph_reader: &mut UniswapSubgraphClient,
         last_block_considered: &mut u64,
         reorg_protection: bool,
         chain_id: u32,
@@ -543,7 +544,7 @@ impl Orderbook {
             self.sort_orders(auction_id).await;
             self.sort_orders_display(auction_id).await;
             if let Err(err) = self
-                .update_clearing_price_info(&mut the_graph_reader, auction_id, chain_id)
+                .update_clearing_price_info(the_graph_reader, auction_id, chain_id)
                 .await
             {
                 tracing::debug!(
@@ -558,7 +559,7 @@ impl Orderbook {
     }
     pub async fn update_clearing_price_info(
         &self,
-        mut the_graph_reader: &mut UniswapSubgraphClient,
+        the_graph_reader: &mut UniswapSubgraphClient,
         auction_id: u64,
         chain_id: u32,
     ) -> Result<()> {
@@ -588,7 +589,7 @@ impl Orderbook {
         self.update_current_bidding_amount_of_details(auction_id, new_clearing_price.2)
             .await?;
         self.update_interest_score(auction_id).await?;
-        self.update_usd_amount_traded_of_details(&mut the_graph_reader, auction_id, chain_id)
+        self.update_usd_amount_traded_of_details(the_graph_reader, auction_id, chain_id)
             .await?;
         Ok(())
     }

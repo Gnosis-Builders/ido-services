@@ -48,6 +48,13 @@ fn main() {
                     "0x6093f70c46350202181e9b0edfcf8f0e966ddddeb8b24e8b73dd2ab636c1ce87",
                 )),
             )
+            .add_deployment(
+                43114,
+                addr("0xb5D00F83680ea5E078e911995c64b43Fbfd1eE61"),
+                Some(tx(
+                    "0xa6fa39783a488c892f28ce75ec2d8d079fb8d7ac4647c09bed9755e4246fd390",
+                )),
+            )
     });
     generate_contract_with_config("AllowListOffChainManaged", |builder| {
         builder
