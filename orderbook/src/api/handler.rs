@@ -73,18 +73,17 @@ pub async fn provide_signatures(
     db: Database,
     signature_object: SignaturesObject,
 ) -> Result<impl warp::Reply, Infallible> {
-    let event_details;
     let event_details_obj = orderbook
         .get_auction_with_details(signature_object.auction_id)
         .await;
-    if let Err(err) = &event_details_obj {
+    let event_details = if let Err(err) = &event_details_obj {
         return Ok(with_status(
             json(&format!("Internal error: {:?}", err)),
             StatusCode::BAD_REQUEST,
         ));
     } else {
-        event_details = event_details_obj.unwrap();
-    }
+        event_details_obj.unwrap()
+    };
     if event_details.chain_id.as_u64() != signature_object.chain_id {
         return Ok(with_status(
             json(&format!(

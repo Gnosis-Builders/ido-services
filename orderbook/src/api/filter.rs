@@ -226,12 +226,9 @@ pub mod test_util {
         orderbook.insert_users(vec![user]).await;
         let filter = get_user_orders(Arc::new(orderbook));
         println!(
-            "{}",
-            format!(
-                "/get_user_orders/{:}/{:}",
-                auction_id,
-                user.show_full_address()
-            )
+            "/get_user_orders/{:}/{:}",
+            auction_id,
+            user.show_full_address()
         );
         let response = request()
             .path(&format!(
@@ -277,12 +274,9 @@ pub mod test_util {
 
         let filter = get_user_orders_without_canceled_or_claimed(Arc::new(orderbook));
         println!(
-            "{}",
-            format!(
-                "/get_user_orders_without_canceled_or_claimed/{:}/{:}",
-                auction_id,
-                user.show_full_address()
-            )
+            "/get_user_orders_without_canceled_or_claimed/{:}/{:}",
+            auction_id,
+            user.show_full_address()
         );
         let response = request()
             .path(&format!(
@@ -416,7 +410,7 @@ pub mod test_util {
         db.clear().await.unwrap();
         let filter = provide_signatures_object(Arc::new(orderbook), db.clone());
         let response = request()
-            .path(&"/provide_signature".to_string())
+            .path("/provide_signature")
             .method("POST")
             .json(&deserialized_signatures)
             .reply(&filter)

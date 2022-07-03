@@ -28,6 +28,7 @@ lazy_static! {
     pub static ref LEGIT_STABLE_COINS: HashMap::<u32, Vec<Address>> = hashmap! {
         1 => vec![Address::from_str("0x6b175474e89094c44da98b954eedeac495271d0f").unwrap(),Address::from_str("0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48").unwrap(), Address::from_str("0xdac17f958d2ee523a2206206994597c13d831ec7").unwrap()],
         4 => vec![Address::from_str("0x5592EC0cfb4dbc12D3aB100b257153436a1f0FEa").unwrap(),Address::from_str("0x4DBCdF9B62e891a7cec5A2568C3F4FAF9E8Abe2b").unwrap()],
+        5 => vec![],
         100 => vec![Address::from_str("0xe91D153E0b41518A2Ce8Dd3D7944Fa863463a97d").unwrap()],
         137 => vec![Address::from_str("0x8f3Cf7ad23Cd3CaDbD9735AFf958023239c6A063").unwrap(), Address::from_str("0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174").unwrap()],
         43114 => vec![Address::from_str("0xA7D7079b0FEaD91F3e65f86E8915Cb59c1a4C664").unwrap(), Address::from_str("0xB97EF9Ef8734C71904D8002F8b6Bc66Dd9c48a6E").unwrap()],
@@ -83,7 +84,9 @@ impl Orderbook {
             }
         }
         let (decimals_auctioning_token, decimals_bidding_token) =
-            self.get_decimals(auction_id).await;
+            self.get_decimals(auction_id).await.unwrap_or_else(|_| {
+                panic!("get_decimals returns error for auction_id {:}", auction_id)
+            });
         {
             let mut hashmap = self.orders_display.write().await;
             let vec_price_points: Vec<PricePoint> = orders
@@ -177,22 +180,32 @@ impl Orderbook {
             Entry::Vacant(_) => {}
         }
     }
-    pub async fn get_decimals(&self, auction_id: u64) -> (U256, U256) {
+    pub async fn get_decimals(&self, auction_id: u64) -> Result<(U256, U256)> {
         let decimals_auctioning_token;
         let decimals_bidding_token;
         {
             let reading_guard = self.auction_details.read().await;
             decimals_auctioning_token = reading_guard
                 .get(&auction_id)
-                .expect("auction not yet initialized in backend")
+                .ok_or_else(|| {
+                    anyhow!(
+                        "decimals for auctioning token not yet available for auction with id {:}",
+                        auction_id
+                    )
+                })?
                 .decimals_auctioning_token;
 
             decimals_bidding_token = reading_guard
                 .get(&auction_id)
-                .expect("auction not yet initialized in backend")
+                .ok_or_else(|| {
+                    anyhow!(
+                        "decimals for bidding token not yet available for auction with id {:}",
+                        auction_id
+                    )
+                })?
                 .decimals_bidding_token;
         }
-        (decimals_auctioning_token, decimals_bidding_token)
+        Ok((decimals_auctioning_token, decimals_bidding_token))
     }
     pub async fn remove_orders(&self, auction_id: u64, orders: Vec<Order>) {
         if orders.is_empty() {
@@ -208,7 +221,9 @@ impl Orderbook {
             }
         }
         let (decimals_auctioning_token, decimals_bidding_token) =
-            self.get_decimals(auction_id).await;
+            self.get_decimals(auction_id).await.unwrap_or_else(|_| {
+                panic!("get_decimals returns error for auction_id {:}", auction_id)
+            });
         {
             let mut hashmap = self.orders_display.write().await;
             let vec_price_points: Vec<PricePoint> = orders
@@ -260,7 +275,12 @@ impl Orderbook {
     pub async fn get_order_book_display(&self, auction_id: u64) -> Result<OrderbookDisplay> {
         let bids: Vec<PricePoint>;
         let (decimals_auctioning_token, decimals_bidding_token) =
-            self.get_decimals(auction_id).await;
+            match self.get_decimals(auction_id).await {
+                Ok((decimals_auctioning_token, decimals_bidding_token)) => {
+                    (decimals_auctioning_token, decimals_bidding_token)
+                }
+                Err(err) => return Err(err),
+            };
         {
             let orders_hashmap = self.orders_display.read().await;
             if let Some(orders) = orders_hashmap.get(&auction_id) {
@@ -476,19 +496,16 @@ impl Orderbook {
             }
         }
 
-        let new_auctions: Vec<AuctionDetails>;
-        match event_reader
+        let new_auctions = match event_reader
             .get_auction_updates(from_block, to_block, chain_id)
             .await
         {
-            Ok(auction_updates) => {
-                new_auctions = auction_updates;
-            }
+            Ok(auction_updates) => auction_updates,
             Err(err) => {
                 tracing::info!("get_order_updates was not successful with error: {:}", err);
                 return Ok(());
             }
-        }
+        };
         for auction_details in new_auctions {
             self.set_auction_details(auction_details.auction_id, auction_details)
                 .await?;
@@ -656,7 +673,15 @@ impl Orderbook {
     }
     pub async fn get_auction_with_details(&self, auction_id: u64) -> Result<AuctionDetails> {
         let auction_details_hashmap = self.auction_details.read().await;
-        Ok(auction_details_hashmap.get(&auction_id).unwrap().clone())
+        match auction_details_hashmap.get(&auction_id) {
+            Some(details) => Ok(details.clone()),
+            None => {
+                return Err(anyhow!(
+                    "Auction with the id {:} does not exist",
+                    auction_id
+                ))
+            }
+        }
     }
     pub async fn update_current_price_of_details(&self, auction_id: u64, price: f64) -> Result<()> {
         let mut auction_details_hashmap = self.auction_details.write().await;

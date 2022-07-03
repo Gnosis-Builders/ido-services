@@ -35,6 +35,13 @@ fn main() {
                 )),
             )
             .add_deployment(
+                5,
+                addr("0x1fbab40c338e2e7243da945820ba680c92ef8281"),
+                Some(tx(
+                    "0x6cbf82cec76ea4800d51150478fce1fbfb2284e450624489fbe3dbd4324fcc4b",
+                )),
+            )
+            .add_deployment(
                 100,
                 addr("0b7fFc1f4AD541A4Ed16b40D8c37f0929158D101"),
                 Some(tx(
@@ -74,6 +81,13 @@ fn main() {
                 )),
             )
             .add_deployment(
+                5,
+                addr("E0AD16EB7Ea467C694E6cFdd5E7D61FE850e8B53"),
+                Some(tx(
+                    "0x9f0f572fc33d041b0607e28fcc8930fb014caf3ba0d36130b0a7089bc81c37b0",
+                )),
+            )
+            .add_deployment(
                 100,
                 addr("0F4648d997e486cE06577d6Ee2FecBcA84b834F4"),
                 Some(tx(
@@ -96,6 +110,13 @@ fn main() {
                 addr("845AbED0734e39614FEC4245F3F3C88E2da98157"),
                 Some(tx(
                     "0xdc6b81239087cc685f4bd9f3a9733d3b0fdc54326868dee8b57b4073ef1fc92e",
+                )),
+            )
+            .add_deployment(
+                5,
+                addr("c6e51F2cb369F03672197D0C31Dd5F0d9566217B"),
+                Some(tx(
+                    "0xecc56591c81b14f90635c6ae7bb3e7e22cd9fa118e92d12d2af465df490074a1",
                 )),
             )
             .add_deployment(
