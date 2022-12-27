@@ -38,7 +38,7 @@ struct Arguments {
     #[structopt(
         long,
         env = "NODE_URL",
-        default_value = "https://rpc.ankr.com/eth_rinkeby"
+        default_value = "https://rpc.ankr.com/eth"
     )]
     pub node_url: Url,
 
