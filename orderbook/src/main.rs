@@ -38,7 +38,7 @@ struct Arguments {
     #[structopt(
         long,
         env = "NODE_URL",
-        default_value = "https://staging-openethereum.rinkeby.gnosisdev.com"
+        default_value = "https://rpc.ankr.com/eth"
     )]
     pub node_url: Url,
 
@@ -46,7 +46,7 @@ struct Arguments {
     #[structopt(
         long,
         env = "NUMBER_OF_BLOCKS_TO_SYNC_PER_REQUEST",
-        default_value = "10000"
+        default_value = "500"
     )]
     pub number_of_blocks_to_sync_per_request: u64,
 
