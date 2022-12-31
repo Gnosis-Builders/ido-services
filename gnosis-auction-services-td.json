@@ -1,61 +1,44 @@
 {
-    "containerDefinitions": [
-        {
-            "name": "gnosis-auction-services",
-            "image": "024343560884.dkr.ecr.us-east-1.amazonaws.com/dex-gnosis-auction-services:develop",
-            "cpu": 0,
-            "links": [],
-            "portMappings": [],
-            "essential": true,
-            "entryPoint": [],
-            "command": [],
-            "environment": [],
-            "environmentFiles": [],
-            "mountPoints": [],
-            "volumesFrom": [],
-            "secrets": [],
-            "dnsServers": [],
-            "dnsSearchDomains": [],
-            "extraHosts": [],
-            "dockerSecurityOptions": [],
-            "dockerLabels": {},
-            "ulimits": [],
-            "logConfiguration": {
-                "logDriver": "awslogs",
-                "options": {
-                    "awslogs-create-group": "true",
-                    "awslogs-group": "/ecs/gnosis-auction-services-td",
-                    "awslogs-region": "us-east-1",
-                    "awslogs-stream-prefix": "ecs"
-                },
-                "secretOptions": []
-            },
-            "systemControls": []
-        }
-    ],
-    "family": "gnosis-auction-services-td",
-    "taskRoleArn": "arn:aws:iam::024343560884:role/gnosis-auction-services-tr",
-    "executionRoleArn": "arn:aws:iam::024343560884:role/gnosis-auction-services-tr",
-    "networkMode": "awsvpc",
-    "volumes": [],
-    "placementConstraints": [],
-    "requiresCompatibilities": [
-        "FARGATE"
-    ],
-    "cpu": "512",
-    "memory": "1024",
-    "runtimePlatform": {
-        "cpuArchitecture": "X86_64",
-        "operatingSystemFamily": "LINUX"
-    },
-    "tags": [
+  "containerDefinitions": [
+      {
+          "name": "gnosis-auction-services",
+          "image": "024343560884.dkr.ecr.us-east-1.amazonaws.com/dex-gnosis-auction-services:develop",
+          "logConfiguration": {
+            "logDriver": "awslogs",
+            "options": {
+              "awslogs-group": "gnosis-auction-services-log",
+              "awslogs-region": "us-east-1",
+              "awslogs-stream-prefix": "watch",
+              "awslogs-create-group": "true",
+              "mode": "non-blocking",
+              "max-buffer-size": "2m"
+            }
+          },
+          "cpu": 0,
+          "portMappings": [],
+          "essential": true,
+          "environment": [],
+          "mountPoints": [],
+          "volumesFrom": []
+      }
+  ],
+  "family": "gnosis-auction-services-td",
+  "executionRoleArn": "arn:aws:iam::207935996736:role/ecsTaskExecutionRole",
+  "networkMode": "awsvpc",
+  "volumes": [],
+  "placementConstraints": [],
+  "requiresCompatibilities": [
+      "FARGATE"
+  ],
+  "cpu": "1024",
+  "memory": "3072",
+  "ephemeralStorage": {
+      "sizeInGiB": 21
+  },
+  "tags": [
         {
             "key": "ecs:taskDefinition:createdFrom",
-            "value": "ecs-console-v2"
-        },
-        {
-            "key": "ecs:taskDefinition:stackId",
-            "value": "arn:aws:cloudformation:us-east-1:024343560884:stack/ECS-Console-V2-TaskDefinition-8e6490ab-0ec2-4908-976e-d487258ebc21/d7ac79d0-8841-11ed-bdc7-0af9147e5343"
+            "value": "GitHub Actions"
         }
-    ]
+]
 }
