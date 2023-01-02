@@ -1,13 +1,14 @@
 name: deploy
 on:
   push:
-    branches: [master]
+    branches: [main]
+    tags: [v*]
 jobs:
   deploy:
     runs-on: ubuntu-latest
     env:
       REGISTRY_URI: 163030813197.dkr.ecr.eu-central-1.amazonaws.com/dex-ido-service
-      AWS_REGION: us-east-1
+      AWS_REGION: eu-central-1
       AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
     steps:
       - uses: actions/checkout@v2
