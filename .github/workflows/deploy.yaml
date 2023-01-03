@@ -8,10 +8,10 @@ jobs:
     env:
       AWS_REGION: us-east-1
       CONTAINER_NAME: gnosis-auction-services
-      ECS_SERVICE: gnosis-builders-svc
-      ECS_CLUSTER: gnosis-builders-fargate
+      ECS_SERVICE: dex-gnosis-auction-service
+      ECS_CLUSTER: dex-gnosis-auction-services
       ECS_TASK_DEFINITION: gnosis-auction-services-td.json
-      ECR_REPOSITORY: gnosis-auction
+      ECR_REPOSITORY: dex-gnosis-auction-services
     steps:
       - name: Checkout
         uses: actions/checkout@v3

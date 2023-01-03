@@ -23,7 +23,7 @@
       }
   ],
   "family": "gnosis-auction-services-td",
-  "executionRoleArn": "arn:aws:iam::207935996736:role/ecsTaskExecutionRole",
+  "executionRoleArn": "arn:aws:iam::024343560884:role/gnosis-auction-services-tr",
   "networkMode": "awsvpc",
   "volumes": [],
   "placementConstraints": [],
