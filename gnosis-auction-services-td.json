@@ -3,6 +3,7 @@
       {
           "name": "gnosis-auction-services",
           "image": "024343560884.dkr.ecr.us-east-1.amazonaws.com/dex-gnosis-auction-services:develop",
+          "command": ["orderbook"],
           "logConfiguration": {
             "logDriver": "awslogs",
             "options": {
