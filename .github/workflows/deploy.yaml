@@ -7,7 +7,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        container: [auction-gnosis-td, auction-goerli, auction-polygon,  auction-ankr]
+        container: [auction-gnosis, auction-goerli, auction-polygon,  auction-ankr]
     env:
       AWS_REGION: us-east-1
       ECS_CLUSTER: dex-gnosis-auction-services
