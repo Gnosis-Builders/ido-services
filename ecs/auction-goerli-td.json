@@ -1,7 +1,7 @@
 {
   "containerDefinitions": [
       {
-          "name": "gnosis-auction-services",
+          "name": "auction-goerli",
           "image": "024343560884.dkr.ecr.us-east-1.amazonaws.com/dex-gnosis-auction-services:develop",
           "command": ["orderbook", "--node_url=https://rpc.ankr.com/eth_goerli"],
           "logConfiguration": {
@@ -35,7 +35,7 @@
             }
       }
   ],
-  "family": "gnosis-auction-services-td",
+  "family": "auction-goerli-td",
   "executionRoleArn": "arn:aws:iam::024343560884:role/gnosis-auction-services-tr",
   "networkMode": "awsvpc",
   "volumes": [],
