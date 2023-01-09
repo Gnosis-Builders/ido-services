@@ -10,7 +10,7 @@ jobs:
       CONTAINER_NAME: gnosis-auction-services
       ECS_SERVICE: dex-gnosis-auction-service
       ECS_CLUSTER: dex-gnosis-auction-services
-      ECS_TASK_DEFINITION: gnosis-auction-services-td.json
+      ECS_TASK_DEFINITION: ecs/auction-gnosis-td.json
       ECR_REPOSITORY: dex-gnosis-auction-services
     steps:
       - name: Checkout
