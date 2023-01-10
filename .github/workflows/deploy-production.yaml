@@ -5,13 +5,13 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        container: [auction-gnosis, auction-goerli, auction-polygon,  auction-ankr]
     env:
       AWS_REGION: us-east-1
-      CONTAINER_NAME: gnosis-auction-services
-      ECS_SERVICE: dex-gnosis-auction-service
-      ECS_CLUSTER: dex-gnosis-auction-services
-      ECS_TASK_DEFINITION: gnosis-auction-services-td.json
-      ECR_REPOSITORY: dex-gnosis-auction-services
+      ECS_CLUSTER: gnosis-auction
+      ECR_REPOSITORY: gnosis-auction
     steps:
       - name: Checkout
         uses: actions/checkout@v3
@@ -42,15 +42,15 @@ jobs:
         id: task-def
         uses: aws-actions/amazon-ecs-render-task-definition@v1
         with:
-          task-definition: ${{ env.ECS_TASK_DEFINITION }}
-          container-name: ${{ env.CONTAINER_NAME }}
+          task-definition:  ecs/${{ matrix.container }}-td.json
+          container-name: ${{ matrix.container }}
           image: ${{ steps.build-image.outputs.image }}
 
       - name: Deploy Amazon ECS task definition
         uses: aws-actions/amazon-ecs-deploy-task-definition@v1
         with:
-          task-definition: ${{ steps.task-def.outputs.task-definition }}
-          service: ${{ env.ECS_SERVICE }}
+          task-definition:  ecs/${{ matrix.container }}-td.json
+          service: ${{ matrix.container }}-svc
           cluster: ${{ env.ECS_CLUSTER }}
           wait-for-service-stability: true
           
