@@ -29,10 +29,7 @@
           "essential": true,
           "environment": [],
           "mountPoints": [],
-          "volumesFrom": [],
-          "linuxParameters": {
-              "initProcessEnabled": true
-            }
+          "volumesFrom": []
       }
   ],
   "family": "auction-ankr-td",
