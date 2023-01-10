@@ -1,7 +1,7 @@
 name: deploy
 on:
   push:
-    branches: [develop]
+    branches: [master]
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -10,8 +10,8 @@ jobs:
         container: [auction-gnosis, auction-goerli, auction-polygon,  auction-ankr]
     env:
       AWS_REGION: us-east-1
-      ECS_CLUSTER: dex-gnosis-auction-services
-      ECR_REPOSITORY: dex-gnosis-auction-services
+      ECS_CLUSTER: gnosis-auction
+      ECR_REPOSITORY: gnosis-auction
     steps:
       - name: Checkout
         uses: actions/checkout@v3

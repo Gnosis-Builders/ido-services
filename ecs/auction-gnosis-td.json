@@ -1,0 +1,57 @@
+{
+  "containerDefinitions": [
+      {
+          "name": "auction-gnosis",
+          "image": "024343560884.dkr.ecr.us-east-1.amazonaws.com/dex-gnosis-auction-services:develop",
+          "command": ["orderbook", "--node_url=http://rpc.gnosis.gateway.fm/"],
+          "logConfiguration": {
+            "logDriver": "awslogs",
+            "options": {
+              "awslogs-group": "gnosis-auction-services-log",
+              "awslogs-region": "us-east-1",
+              "awslogs-stream-prefix": "watch",
+              "awslogs-create-group": "true",
+              "mode": "non-blocking",
+              "max-buffer-size": "2m"
+            }
+          },
+          "cpu": 0,
+          "portMappings": [
+            {
+              "containerPort": 80,
+              "hostPort": 80
+            },
+            {
+              "containerPort": 8080,
+              "hostPort": 8080
+            }
+          ],
+          "essential": true,
+          "environment": [],
+          "mountPoints": [],
+          "volumesFrom": [],
+          "linuxParameters": {
+              "initProcessEnabled": true
+            }
+      }
+  ],
+  "family": "auction-gnosis-td",
+  "executionRoleArn": "arn:aws:iam::024343560884:role/gnosis-auction-services-tr",
+  "networkMode": "awsvpc",
+  "volumes": [],
+  "placementConstraints": [],
+  "requiresCompatibilities": [
+      "FARGATE"
+  ],
+  "cpu": "1024",
+  "memory": "3072",
+  "ephemeralStorage": {
+      "sizeInGiB": 21
+  },
+  "tags": [
+        {
+            "key": "ecs:taskDefinition:createdFrom",
+            "value": "GitHub Actions"
+        }
+]
+}
