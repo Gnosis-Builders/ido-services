@@ -29,7 +29,10 @@
           "essential": true,
           "environment": [],
           "mountPoints": [],
-          "volumesFrom": []
+          "volumesFrom": [],
+          "linuxParameters": {
+              "initProcessEnabled": true
+            }
       }
   ],
   "family": "auction-goerli-td",
