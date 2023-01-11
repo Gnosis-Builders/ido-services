@@ -9,11 +9,11 @@ RUN cargo build --target x86_64-unknown-linux-musl --release
 FROM alpine:latest
 
 # Handle signal handlers properly
-RUN apk add --no-cache tini
+RUN apk add dumb-init
 COPY --from=cargo-build /usr/src/app/target/x86_64-unknown-linux-musl/release/orderbook /usr/local/bin/orderbook
 EXPOSE 80
 EXPOSE 8080
 
 
 CMD echo "Specify binary - either solver or orderbook"
-ENTRYPOINT ["/sbin/tini", "--"]
+ENTRYPOINT ["/usr/bin/dumb-init", "--"]
