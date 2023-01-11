@@ -8,6 +8,7 @@ jobs:
     env:
       AWS_REGION: us-east-1
       ECR_REPOSITORY: dex-gnosis-auction-services
+    name: Log in and build
     steps:
       - name: Checkout
         uses: actions/checkout@v3
@@ -35,6 +36,7 @@ jobs:
           echo "image=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_OUTPUT
 
   deploy:
+    name: Deploy the four containers
     needs: build
     runs-on: ubuntu-latest
     strategy:
@@ -42,6 +44,7 @@ jobs:
         container: [auction-gnosis, auction-goerli, auction-polygon,  auction-ankr]
     env:
       ECS_CLUSTER: dex-gnosis-auction-services
+    steps:
       - name: Fill in the new image ID in the Amazon ECS task definition
         id: task-def
         uses: aws-actions/amazon-ecs-render-task-definition@v1
