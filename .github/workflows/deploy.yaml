@@ -3,14 +3,10 @@ on:
   push:
     branches: [develop]
 jobs:
-  deploy:
+  build:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        container: [auction-gnosis, auction-goerli, auction-polygon,  auction-ankr]
     env:
       AWS_REGION: us-east-1
-      ECS_CLUSTER: dex-gnosis-auction-services
       ECR_REPOSITORY: dex-gnosis-auction-services
     steps:
       - name: Checkout
@@ -38,6 +34,14 @@ jobs:
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
           echo "image=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_OUTPUT
 
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        container: [auction-gnosis, auction-goerli, auction-polygon,  auction-ankr]
+    env:
+      ECS_CLUSTER: dex-gnosis-auction-services
       - name: Fill in the new image ID in the Amazon ECS task definition
         id: task-def
         uses: aws-actions/amazon-ecs-render-task-definition@v1
