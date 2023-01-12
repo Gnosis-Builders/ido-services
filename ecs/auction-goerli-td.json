@@ -3,7 +3,7 @@
       {
           "name": "auction-goerli",
           "image": "024343560884.dkr.ecr.us-east-1.amazonaws.com/dex-gnosis-auction-services:15ccc53d10ed04df0bf5ce46dcefcea5944876d1",
-          "command": ["orderbook", "-- --node_url=https://rpc.ankr.com/eth_goerli"],
+          "command": ["-- --node_url=https://rpc.ankr.com/eth_goerli", "orderbook"],
           "logConfiguration": {
             "logDriver": "awslogs",
             "options": {
