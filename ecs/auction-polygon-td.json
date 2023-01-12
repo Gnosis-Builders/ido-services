@@ -3,7 +3,7 @@
       {
           "name": "auction-polygon",
           "image": "024343560884.dkr.ecr.us-east-1.amazonaws.com/dex-gnosis-auction-services:15ccc53d10ed04df0bf5ce46dcefcea5944876d1",
-          "command": ["node_url=https://polygon.llamarpc.com", "orderbook"],
+          "command": ["orderbook"],
           "logConfiguration": {
             "logDriver": "awslogs",
             "options": {
@@ -27,7 +27,9 @@
             }
           ],
           "essential": true,
-          "environment": [],
+          "environment": [
+            {"name": "NODE_URL", "value": "https://polygon.llamarpc.com"}
+          ],
           "mountPoints": [],
           "volumesFrom": [],
           "linuxParameters": {
